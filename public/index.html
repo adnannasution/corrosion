@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Corrosion Mapping System</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap');
+
+:root {
+  --bg: #0a0e14;
+  --panel: #0f1520;
+  --panel2: #141d2b;
+  --panel3: #0d1826;
+  --border: #1e2d42;
+  --border2: #253d5c;
+  --text: #c8d8e8;
+  --dim: #5a7490;
+  --accent: #00aaff;
+  --good: #00e676;
+  --monitor: #ffea00;
+  --warning: #ff9100;
+  --critical: #ff1744;
+  --pipe: #1e3a5f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+.logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+  flex-shrink: 0;
+}
+.logo span { color: var(--dim); font-size: 0.68rem; display: block; letter-spacing: 1px; }
+.header-stats { display: flex; gap: 20px; }
+.hstat { text-align: center; font-family: 'Barlow Condensed', sans-serif; }
+.hstat-val { font-size: 1.35rem; font-weight: 700; line-height: 1; }
+.hstat-lbl { font-size: 0.58rem; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border2);
+  background: var(--panel2);
+  color: var(--text);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--border); }
+.btn-primary { background: var(--accent); color: #000; border-color: var(--accent); }
+.btn-primary:hover { opacity: 0.85; background: var(--accent); }
+.btn-warn { background: rgba(255,145,0,0.15); color: var(--warning); border-color: var(--warning); }
+.btn-warn:hover { background: rgba(255,145,0,0.25); }
+.legend {
+  display: flex; gap: 10px; align-items: center;
+  font-size: 0.65rem; font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.leg { display: flex; align-items: center; gap: 4px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+/* ── LAYOUT ── */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 280px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sidebar-top {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.search-box {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  padding: 5px 8px;
+  border-radius: 3px;
+  outline: none;
+}
+.search-box:focus { border-color: var(--accent); }
+.eq-list { overflow-y: auto; flex: 1; }
+.eq-list::-webkit-scrollbar { width: 4px; }
+.eq-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.eq-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(30,45,66,0.5);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.eq-item:hover { background: var(--panel2); }
+.eq-item.selected { background: rgba(0,170,255,0.08); border-left: 2px solid var(--accent); }
+.eq-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
+.eq-info { flex: 1; min-width: 0; }
+.eq-tag-sb { font-family: 'Share Tech Mono', monospace; font-size: 0.72rem; color: var(--accent); }
+.eq-name { font-size: 0.65rem; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eq-rl { font-family: 'Barlow Condensed', sans-serif; font-size: 0.82rem; font-weight: 600; text-align: right; }
+.eq-rl-lbl { font-size: 0.52rem; color: var(--dim); text-align: right; letter-spacing: 1px; }
+.section-sep {
+  padding: 4px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.58rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: var(--panel3);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── SINGLE INPUT PANEL ── */
+.input-panel {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  background: var(--panel2);
+}
+.input-panel h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+.sel-tag { font-family: 'Share Tech Mono', monospace; font-size: 0.85rem; color: var(--accent); margin-bottom: 10px; display: block; }
+.field { margin-bottom: 8px; }
+.field label { display: block; font-size: 0.6rem; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin-bottom: 3px; }
+.field-row { display: flex; gap: 5px; align-items: center; }
+.field input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.82rem;
+  padding: 5px 8px;
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field input:focus { border-color: var(--accent); }
+.field .unit { font-size: 0.6rem; color: var(--dim); width: 30px; }
+.calc-row {
+  background: rgba(0,170,255,0.06);
+  border: 1px solid rgba(0,170,255,0.18);
+  border-radius: 3px;
+  padding: 6px 9px;
+  margin-bottom: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.calc-lbl { font-size: 0.58rem; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+.calc-val { font-size: 1.2rem; font-weight: 700; }
+.btn-save {
+  width: 100%;
+  padding: 7px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 3px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-save:hover { opacity: 0.85; }
+.no-sel { color: var(--dim); font-size: 0.72rem; text-align: center; padding: 16px 0; line-height: 1.8; }
+
+/* ── CANVAS ── */
+.canvas-wrap {
+  flex: 1; overflow: hidden; position: relative; cursor: grab;
+  background: var(--bg);
+  background-image:
+    linear-gradient(rgba(30,45,66,0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30,45,66,0.28) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+#pfd { display: block; cursor: default; }
+.pipe { stroke: var(--pipe); stroke-width: 3; fill: none; }
+.eq-node { cursor: pointer; }
+.eq-node:hover .eq-body { filter: brightness(1.3); }
+.eq-label { font-family: 'Share Tech Mono', monospace; font-size: 12px; fill: #8ab; pointer-events: none; }
+.eq-tag-text { font-family: 'Share Tech Mono', monospace; font-size: 15px; fill: #00aaff; pointer-events: none; }
+@keyframes pulse-critical { 0%,100%{opacity:1} 50%{opacity:0.35} }
+.critical-pulse { animation: pulse-critical 1.2s ease-in-out infinite; }
+.canvas-wrap::before {
+  content:''; position:absolute; inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,170,255,0.01) 4px);
+  pointer-events: none; z-index: 1;
+}
+
+/* ── TOOLTIP ── */
+#tooltip {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 10px 13px;
+  font-size: 0.72rem;
+  pointer-events: none;
+  z-index: 9999;
+  display: none;
+  min-width: 190px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+}
+#tooltip .tt-tag { font-family:'Share Tech Mono',monospace; font-size:0.85rem; color:var(--accent); margin-bottom:2px; }
+#tooltip .tt-name { color:var(--dim); font-size:0.65rem; margin-bottom:7px; }
+#tooltip .tt-row { display:flex; justify-content:space-between; gap:14px; margin-bottom:3px; }
+#tooltip .tt-key { color:var(--dim); font-size:0.65rem; }
+#tooltip .tt-val { font-family:'Share Tech Mono',monospace; font-size:0.72rem; font-weight:600; }
+#tooltip .tt-status {
+  margin-top:5px; padding:3px 8px; border-radius:2px;
+  font-family:'Barlow Condensed',monospace; font-size:0.72rem; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; text-align:center;
+}
+
+/* ══════════════════════════════════════
+   BULK INPUT MODAL
+══════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(5,10,18,0.88);
+  z-index: 1000;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  width: 100%;
+  max-width: 1180px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  flex: 1;
+}
+.modal-subtitle { font-size: 0.65rem; color: var(--dim); margin-top: 2px; }
+.modal-close {
+  background: none; border: 1px solid var(--border);
+  color: var(--dim); font-size: 1.1rem;
+  width: 28px; height: 28px; border-radius: 3px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.modal-close:hover { border-color: var(--critical); color: var(--critical); }
+
+/* Tabs */
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 18px;
+  background: var(--panel3);
+}
+.tab-btn {
+  padding: 8px 18px;
+  background: none; border: none;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--dim); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Toolbar */
+.modal-toolbar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; flex-wrap: wrap;
+}
+.modal-search {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem; padding: 5px 10px; border-radius: 3px; outline: none; width: 200px;
+}
+.modal-search:focus { border-color: var(--accent); }
+.filter-pill {
+  padding: 4px 10px; border-radius: 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.65rem; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  cursor: pointer; border: 1px solid transparent; transition: all 0.12s;
+}
+.pill-all  { border-color:var(--border2); color:var(--text); background:var(--panel2); }
+.pill-all.on,.pill-all:hover { background:var(--border2); }
+.pill-good    { border-color:var(--good);    color:var(--good);    background:rgba(0,230,118,0.08); }
+.pill-good.on { background:rgba(0,230,118,0.2); }
+.pill-monitor    { border-color:var(--monitor); color:var(--monitor); background:rgba(255,234,0,0.08); }
+.pill-monitor.on { background:rgba(255,234,0,0.2); }
+.pill-warning    { border-color:var(--warning); color:var(--warning); background:rgba(255,145,0,0.08); }
+.pill-warning.on { background:rgba(255,145,0,0.2); }
+.pill-critical    { border-color:var(--critical); color:var(--critical); background:rgba(255,23,68,0.08); }
+.pill-critical.on { background:rgba(255,23,68,0.2); }
+.pill-nodata { border-color:var(--dim); color:var(--dim); background:transparent; }
+.pill-nodata.on { background:rgba(90,116,144,0.2); }
+.spacer { flex: 1; }
+.paste-hint {
+  font-size: 0.62rem; color: var(--dim); font-style: italic;
+  background: rgba(0,170,255,0.06); border: 1px solid rgba(0,170,255,0.15);
+  border-radius: 3px; padding: 4px 8px;
+}
+
+/* Table */
+.modal-body { flex: 1; overflow: auto; }
+.modal-body::-webkit-scrollbar { width: 6px; height: 6px; }
+.modal-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+.bulk-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.bulk-table thead { position: sticky; top: 0; z-index: 10; background: var(--panel3); }
+.bulk-table th {
+  padding: 8px 8px; text-align: left;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.6rem; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--dim); border-bottom: 1px solid var(--border2); white-space: nowrap;
+}
+.bulk-table th.num { width: 30px; text-align: center; }
+.bulk-table td {
+  padding: 3px 5px;
+  border-bottom: 1px solid rgba(30,45,66,0.4);
+  vertical-align: middle;
+}
+.bulk-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+.bulk-table tbody tr.row-new { background: rgba(0,170,255,0.03); }
+.bulk-table tbody tr.row-modified { background: rgba(255,234,0,0.02); }
+.td-num { text-align:center; color:var(--dim); font-size:0.62rem; font-family:'Share Tech Mono',monospace; }
+.td-tag-cell { font-family:'Share Tech Mono',monospace; color:var(--accent); font-size:0.73rem; white-space:nowrap; padding-left:8px; }
+.td-name-cell { color:var(--dim); font-size:0.67rem; max-width:150px; }
+.td-fixed { font-family:'Share Tech Mono',monospace; color:var(--dim); text-align:right; padding-right:12px; font-size:0.72rem; }
+.td-status {
+  text-align:center; font-family:'Barlow Condensed',sans-serif;
+  font-size:0.63rem; font-weight:700; letter-spacing:1px; white-space:nowrap;
+}
+.td-rl {
+  font-family:'Share Tech Mono',monospace; font-weight:700;
+  text-align:right; padding-right:10px; font-size:0.78rem;
+}
+.cell-input {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: 0.73rem; padding: 3px 6px; border-radius: 2px;
+  outline: none; width: 80px; transition: border-color 0.15s;
+}
+.cell-input:focus { border-color: var(--accent); }
+.cell-input.changed { border-color: rgba(255,234,0,0.5); background: rgba(255,234,0,0.04); }
+.cell-input.cinp-sm { width: 55px; }
+.cell-input.cinp-xs { width: 42px; }
+.cell-input.cinp-lg { width: 130px; }
+.cell-input.cinp-md { width: 90px; }
+
+/* Add row */
+.add-row-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 18px; color: var(--dim);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.72rem; letter-spacing: 1px;
+  cursor: pointer; border-top: 1px dashed var(--border);
+  transition: all 0.12s;
+  background: none; border-bottom: none; border-left: none; border-right: none;
+  width: 100%; text-align: left;
+}
+.add-row-btn:hover { color: var(--accent); background: rgba(0,170,255,0.04); }
+
+/* Footer */
+.modal-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px; border-top: 1px solid var(--border);
+  background: var(--panel3); flex-shrink: 0;
+}
+.save-summary { flex: 1; font-family: 'Barlow Condensed', sans-serif; font-size: 0.72rem; color: var(--dim); }
+.save-summary strong { color: var(--text); }
+.btn-save-all {
+  padding: 8px 24px; background: var(--accent); color: #000; border: none;
+  border-radius: 3px; font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.85rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  cursor: pointer; transition: opacity 0.2s;
+}
+.btn-save-all:hover { opacity: 0.85; }
+.btn-discard {
+  padding: 7px 14px; background: none; border: 1px solid var(--border2);
+  color: var(--dim); border-radius: 3px;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem;
+  font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-discard:hover { border-color: var(--critical); color: var(--critical); }
+.row-del {
+  background: none; border: 1px solid var(--border); color: var(--dim);
+  border-radius: 2px; width: 22px; height: 22px; cursor: pointer; font-size: 0.8rem;
+  display: inline-flex; align-items: center; justify-content: center; transition: all 0.12s;
+}
+.row-del:hover { border-color: var(--critical); color: var(--critical); }
+.row-del:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* ── ZOOM CONTROLS ── */
+.zoom-controls {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 100;
+}
+.zoom-btn {
+  width: 36px; height: 36px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 20px; font-weight: 700;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Share Tech Mono', monospace;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+.zoom-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.zoom-level {
+  width: 36px; height: 28px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-size: 9px; font-family: 'Share Tech Mono', monospace;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; letter-spacing: 0.5px;
+}
+/* Box-select zoom */
+.zoom-box-overlay {
+  position: absolute;
+  border: 2px dashed var(--accent);
+  background: rgba(0,188,212,0.08);
+  pointer-events: none;
+  display: none;
+  z-index: 200;
+}
+/* Canvas wrapper that transforms */
+#pfd-transform-wrap {
+  transform-origin: 0 0;
+  position: absolute;
+  top: 0; left: 0;
+}
+
+/* ── API CONNECTION STATUS ── */
+#api-status-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 14px;
+  background: rgba(0,0,0,0.35);
+  border-bottom: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem; letter-spacing: 1px;
+}
+#api-status-bar .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #3a5070; flex-shrink: 0;
+}
+#api-status-bar .dot.online  { background: var(--good);     box-shadow: 0 0 6px var(--good); }
+#api-status-bar .dot.offline { background: var(--warning);  }
+#api-status-bar .dot.error   { background: var(--critical); }
+#api-status-bar .api-url-txt { color: var(--dim); margin-left: 4px; }
+#api-status-bar .api-sync-btn {
+  margin-left: auto; padding: 1px 10px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--accent); font-family: inherit; font-size: 0.68rem;
+  cursor: pointer; border-radius: 2px; letter-spacing: 1px;
+}
+#api-status-bar .api-sync-btn:hover { background: var(--accent); color: #000; }
+</style>
+
+<!-- ══ API CONFIG — ganti URL setelah deploy Railway ══ -->
+<script>
+  // Auto-detect: jika HTML diakses dari Railway server, pakai URL yang sama
+  // Jika dibuka sebagai file lokal, kosongkan (offline mode)
+  // Untuk paksa URL tertentu: window.API_URL = 'https://xxx.railway.app';
+  (function() {
+    const loc = window.location;
+    if (loc.hostname === 'localhost' || loc.hostname === '127.0.0.1') {
+      window.API_URL = loc.origin;           // dev: http://localhost:3000
+    } else if (loc.protocol === 'file:') {
+      window.API_URL = '';                   // opened as local file → offline
+    } else {
+      window.API_URL = loc.origin;           // Railway: https://xxx.railway.app
+    }
+  })();
+</script>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+
+<div id="api-status-bar">
+  <div class="dot" id="api-dot"></div>
+  <span id="api-status-txt">OFFLINE MODE</span>
+  <span class="api-url-txt" id="api-url-display"></span>
+  <button class="api-sync-btn" onclick="apiSyncAll()">⟳ SYNC</button>
+</div>
+  <div>
+    <div class="logo">CORROSION MAP SYS <span>// Process Unit 11 — Main Fractionation Train</span></div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="hs-total" style="color:var(--accent)">0</div><div class="hstat-lbl">Total</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-good" style="color:var(--good)">0</div><div class="hstat-lbl">Good</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-mon" style="color:var(--monitor)">0</div><div class="hstat-lbl">Monitor</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-warn" style="color:var(--warning)">0</div><div class="hstat-lbl">Warning</div></div>
+    <div class="hstat"><div class="hstat-val" id="hs-crit" style="color:var(--critical)">0</div><div class="hstat-lbl">Critical</div></div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-warn" onclick="openBulkModal('lines')">⊕ BULK LINE INPUT</button>
+    <button class="btn btn-primary" onclick="openBulkModal('equipment')">⊕ BULK TAG INPUT</button>
+  </div>
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:var(--good)"></div>&gt;10yr</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--monitor)"></div>5–10yr</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--warning)"></div>2–5yr</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--critical)"></div>&lt;2yr</div>
+  </div>
+</header>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <input class="search-box" id="sb-search" placeholder="Search tag / name…" oninput="buildSidebar()"/>
+    </div>
+    <div class="eq-list" id="eq-list"></div>
+    <div class="input-panel">
+      <h3>Single Entry</h3>
+      <div id="input-area">
+        <div class="no-sel">Click an item on the map<br>or select from list above.<br><br>For multiple tags use<br><strong style="color:var(--accent)">BULK TAG / LINE INPUT</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <div id="pfd-transform-wrap"><svg id="pfd" width="2800" height="1400" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div class="zoom-box-overlay" id="zoom-box"></div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoom-in-btn" title="Zoom In">+</button>
+      <div class="zoom-level" id="zoom-level-display">100%</div>
+      <button class="zoom-btn" id="zoom-out-btn" title="Zoom Out">−</button>
+      <button class="zoom-btn" id="zoom-reset-btn" title="Reset View" style="font-size:12px;">⊡</button>
+      <button class="zoom-btn" id="zoom-box-btn" title="Box Zoom" style="font-size:12px;" id="box-zoom-toggle">⬚</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- ══════════════════════════════════════
+     BULK INPUT MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="bulk-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">BULK INSPECTION DATA ENTRY</div>
+        <div class="modal-subtitle">Edit multiple rows at once. Tab/Enter to move down. Ctrl+V to paste from Excel (col order: Measured Thickness, Corrosion Rate).</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="tab-btn" id="tab-equipment" onclick="switchTab('equipment')">Equipment Tags</button>
+      <button class="tab-btn" id="tab-lines"     onclick="switchTab('lines')">Line Numbers</button>
+    </div>
+
+    <div class="modal-toolbar">
+      <input class="modal-search" id="modal-search" placeholder="Filter tag / name / description…" oninput="renderTable()"/>
+      <span class="filter-pill pill-all on"      id="pill-all"      onclick="setFilter('all')">All</span>
+      <span class="filter-pill pill-good"         id="pill-good"     onclick="setFilter('good')">Good</span>
+      <span class="filter-pill pill-monitor"      id="pill-monitor"  onclick="setFilter('monitor')">Monitor</span>
+      <span class="filter-pill pill-warning"      id="pill-warning"  onclick="setFilter('warning')">Warning</span>
+      <span class="filter-pill pill-critical"     id="pill-critical" onclick="setFilter('critical')">Critical</span>
+      <span class="filter-pill pill-nodata"       id="pill-nodata"   onclick="setFilter('nodata')">No Data</span>
+      <div class="spacer"></div>
+      <div class="paste-hint">💡 Ctrl+V anywhere in table to paste from Excel</div>
+    </div>
+
+    <div class="modal-body" id="modal-body">
+      <table class="bulk-table">
+        <thead id="bulk-thead"></thead>
+        <tbody id="bulk-tbody"></tbody>
+      </table>
+      <button class="add-row-btn" id="add-row-btn" onclick="addCustomRow()">
+        ＋ &nbsp;Add New Row
+      </button>
+    </div>
+
+    <div class="modal-footer">
+      <div class="save-summary" id="save-summary">Ready.</div>
+      <button class="btn-discard" onclick="discardChanges()">Discard Changes</button>
+      <button class="btn-save-all" onclick="saveAllBulk()">SAVE ALL &amp; UPDATE MAP</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  MASTER DATA — Spacious layout, canvas 2800×1400
+// ════════════════════════════════════════════════
+const EQUIPMENT = [
+  // ─── MAIN FRACTIONATOR ───
+  { tag:'C-101',    name:'Main Fractionator',        type:'column',    x:615, y:44,  w:60, h:770, nomThk:25, minAllow:10 },
+
+  // ─── STRIPPERS (left) ───
+  { tag:'C-102',    name:'LCO Stripper',             type:'column',    x:340, y:175, w:38, h:290, nomThk:18, minAllow:8  },
+  { tag:'C-103',    name:'HCO Stripper',             type:'column',    x:455, y:365, w:38, h:265, nomThk:18, minAllow:8  },
+
+  // ─── DEBUTANIZER / ABSORBER ───
+  { tag:'C-104',    name:'Debutanizer',              type:'column',    x:1042,y:360, w:44, h:420, nomThk:18, minAllow:8  },
+  { tag:'C-105',    name:'Absorber/Splitter',        type:'column',    x:2010,y:115, w:50, h:545, nomThk:20, minAllow:9  },
+
+  // ─── TOP VESSELS ───
+  { tag:'V-102',    name:'Overhead Accumulator',     type:'vessel-h',  x:783, y:30,  w:205,h:75,  nomThk:14, minAllow:6  },
+  { tag:'V-103',    name:'Debutanizer Reflux Acc.',  type:'vessel-h',  x:1033,y:30,  w:182,h:70,  nomThk:14, minAllow:6  },
+  { tag:'V-104',    name:'HP Separator',             type:'vessel-v',  x:1313,y:20,  w:93, h:315, nomThk:20, minAllow:9  },
+  { tag:'V-156',    name:'LP Separator',             type:'vessel-h',  x:1625,y:25,  w:173,h:65,  nomThk:14, minAllow:6  },
+  { tag:'V-105',    name:'Sour Water Drum',          type:'vessel-v',  x:2536,y:12,  w:70, h:168, nomThk:12, minAllow:5  },
+  { tag:'11-V-107', name:'Debutanizer Reflux Drum',  type:'vessel-v',  x:2310,y:940, w:98, h:187, nomThk:16, minAllow:7  },
+
+  // ─── DESALTERS ───
+  { tag:'V-101A',   name:'Desalter A',               type:'vessel-h',  x:1470,y:1068,w:210,h:65,  nomThk:12, minAllow:5  },
+  { tag:'V-101B',   name:'Desalter B',               type:'vessel-h',  x:1746,y:1068,w:210,h:65,  nomThk:12, minAllow:5  },
+
+  // ─── FURNACE ───
+  { tag:'11-F-101', name:'Crude Charge Heater',      type:'furnace',   x:185, y:1186,w:182,h:182, nomThk:8,  minAllow:3  },
+
+  // ─── OVERHEAD CONDENSERS (pairs) ───
+  { tag:'E-111A',   name:'Reflux Cooler A',          type:'hex',       x:538, y:30,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-111B',   name:'Reflux Cooler B',          type:'hex',       x:538, y:88,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-110A',   name:'Overhead Condenser A',     type:'hex',       x:708, y:30,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-110B',   name:'Overhead Condenser B',     type:'hex',       x:708, y:88,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-118A/B', name:'Debutanizer Condenser',    type:'hex',       x:925, y:30,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-119',    name:'Debutanizer Reboiler',     type:'hex',       x:925, y:88,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-112', name:'Stripper Overhead Cond.',  type:'hex',       x:2065,y:30,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-115A',name:'Absorber Feed Cooler',     type:'hex',       x:2065,y:88,  w:65, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-116 A/B',name:'WGC Intercooler',       type:'hex',       x:2248,y:30,  w:72, h:46,  nomThk:8,  minAllow:3  },
+  { tag:'11-E-117', name:'Amine Cooler',             type:'hex',       x:2248,y:88,  w:65, h:46,  nomThk:8,  minAllow:3  },
+
+  // ─── RIGHT BANK SIDE COOLERS (vertical stack) ───
+  { tag:'11-E-120', name:'HP Cooler',                type:'hex',       x:2344,y:235, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-121', name:'LP Cooler',                type:'hex',       x:2344,y:303, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-122', name:'Product Cooler',           type:'hex',       x:2344,y:371, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-127', name:'Slop Oil Cooler',          type:'hex',       x:2344,y:439, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-123', name:'LCGO Cooler',              type:'hex',       x:2344,y:507, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-124', name:'HCGO Cooler',              type:'hex',       x:2344,y:575, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-125', name:'HCGO Trim Cooler',         type:'hex',       x:2344,y:643, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-128', name:'Feed/Wash Water HX',       type:'hex',       x:2344,y:711, w:72, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-E-126', name:'Desalter Effluent Cooler', type:'hex',       x:2344,y:779, w:72, h:46,  nomThk:10, minAllow:4  },
+
+  // ─── PREHEAT TRAIN ROW 1 (y≈984) ───
+  { tag:'E-106',    name:'Bottom Product HX',        type:'hex',       x:598, y:984, w:60, h:46,  nomThk:12, minAllow:5  },
+  { tag:'E-105A',   name:'HCGO Preheat A',           type:'hex',       x:754, y:984, w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-104',    name:'LCGO Preheat',             type:'hex',       x:913, y:984, w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-103A',   name:'Preheat 3A',               type:'hex',       x:1072,y:984, w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-103B',   name:'Preheat 3B',               type:'hex',       x:1228,y:984, w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-102',    name:'Crude Preheat 2',          type:'hex',       x:1384,y:984, w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-101',    name:'Crude Preheat 1',          type:'hex',       x:1524,y:984, w:60, h:46,  nomThk:10, minAllow:4  },
+
+  // ─── PREHEAT TRAIN ROW 2 (y≈1074) ───
+  { tag:'E-107B',   name:'Reduced Crude HX B',       type:'hex',       x:342, y:1074,w:60, h:46,  nomThk:12, minAllow:5  },
+  { tag:'E-107A',   name:'Reduced Crude HX A',       type:'hex',       x:494, y:1074,w:60, h:46,  nomThk:12, minAllow:5  },
+  { tag:'E-105B',   name:'HCGO Preheat B',           type:'hex',       x:754, y:1074,w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-103C',   name:'Preheat 3C',               type:'hex',       x:1072,y:1074,w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-103D',   name:'Preheat 3D',               type:'hex',       x:1228,y:1074,w:60, h:46,  nomThk:10, minAllow:4  },
+
+  // ─── BOTTOM FEED TRAIN (y≈1270) ───
+  { tag:'E-114',    name:'HCO Product Cooler',       type:'hex',       x:327, y:1325,w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-113',    name:'LCO Product Cooler',       type:'hex',       x:483, y:1325,w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-C-26',  name:'Trim Cooler',              type:'hex',       x:916, y:1325,w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'11-C-117', name:'Preheat HX B',             type:'hex',       x:1072,y:1325,w:60, h:46,  nomThk:12, minAllow:5  },
+  { tag:'11-C-116', name:'Preheat HX A',             type:'hex',       x:1228,y:1325,w:60, h:46,  nomThk:12, minAllow:5  },
+  { tag:'11-C-110', name:'Main Feed HX',             type:'hex',       x:1374,y:1325,w:60, h:46,  nomThk:12, minAllow:5  },
+  { tag:'E-109',    name:'Feed/LCGO HX',             type:'hex',       x:1524,y:1325,w:60, h:46,  nomThk:10, minAllow:4  },
+  { tag:'E-108',    name:'Feed/Bottom HX',           type:'hex',       x:1680,y:1325,w:60, h:46,  nomThk:10, minAllow:4  },
+
+  // ─── AIR COOLER ───
+  { tag:'11-A-101', name:'Air Cooler',               type:'air-cooler',x:410, y:730, w:190,h:120, nomThk:6,  minAllow:2  },
+
+  // ─── PUMPS UPPER ROW (y≈795) ───
+  { tag:'P-119A/B', name:'Reflux Pump 2',            type:'pump',      x:720, y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-104',    name:'Reflux Pump',              type:'pump',      x:855, y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-115A/B', name:'Stabilizer Btm Pump',      type:'pump',      x:995, y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-103A/B', name:'LCO Pump',                 type:'pump',      x:1135,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-102A/B', name:'Bottoms Pump',             type:'pump',      x:1285,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-101A/B', name:'Feed Pump',                type:'pump',      x:1440,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-111',    name:'Debutanizer Btm Pump',     type:'pump',      x:1581,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-110A/B', name:'Absorber Btm Pump',        type:'pump',      x:1720,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-109A/B', name:'Product Pump 2',           type:'pump',      x:1870,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-112',    name:'Product Pump',             type:'pump',      x:1995,y:795, w:50, h:50,  nomThk:12, minAllow:5  },
+
+  // ─── PUMPS LOWER ROW (y≈896) ───
+  { tag:'P-120',    name:'Circ Pump',                type:'pump',      x:720, y:896, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-105A/B', name:'LCGO Pump',                type:'pump',      x:855, y:896, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-106A/B', name:'HCGO Pump',                type:'pump',      x:995, y:896, w:50, h:50,  nomThk:12, minAllow:5  },
+
+  // ─── LEFT AREA PUMPS ───
+  { tag:'P-107',    name:'Overhead Pump',            type:'pump',      x:343, y:643, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-108',    name:'Sour Water Pump',          type:'pump',      x:343, y:730, w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-133',    name:'HCO Pump',                 type:'pump',      x:458, y:730, w:50, h:50,  nomThk:12, minAllow:5  },
+
+  // ─── DESALTER PUMPS ───
+  { tag:'P-113A/B', name:'Desalter Feed Pump',       type:'pump',      x:1406,y:1165,w:50, h:50,  nomThk:12, minAllow:5  },
+  { tag:'P-114A/B', name:'Wash Water Pump',          type:'pump',      x:1720,y:1165,w:50, h:50,  nomThk:12, minAllow:5  },
+];
+
+const PIPES = [
+  // ═══ CRUDE FEED → PREHEAT TRAIN ROW 1 ═══
+  [[0,1348],[185,1348]],
+  [[387,1348],[483,1348]],[[543,1348],[598,1348]],
+  [[658,1348],[754,1348]],[[814,1348],[913,1348]],
+  [[973,1348],[1072,1348]],[[1132,1348],[1228,1348]],
+  [[1288,1348],[1384,1348]],[[1444,1348],[1524,1348]],
+  [[1584,1348],[1680,1348]],[[1740,1348],[1870,1348]],
+  // Feed → desalters
+  [[1870,1348],[2050,1348],[2050,1200],[1956,1200]],
+  [[1680,1200],[1680,1133],[1746,1133]],
+  [[1470,1133],[1406,1133]],
+  [[1456,1165],[1456,1133]],
+
+  // Preheat row 2 (y≈1097)
+  [[402,1097],[494,1097]],[[554,1097],[620,1097]],
+  [[620,1097],[754,1097]],[[814,1097],[860,1097]],
+  [[1072,1097],[1132,1097]],[[1228,1097],[1268,1097]],
+
+  // ═══ C-101 OVERHEAD ═══
+  [[615,88],[575,88],[575,53],[538,53]],
+  [[603,53],[615,53]],
+  [[673,53],[708,53]],[[773,53],[783,53]],
+  [[988,53],[1033,53]],[[1215,53],[1313,53]],
+
+  // Reflux return V-102 → C-101
+  [[783,105],[762,105],[762,130],[615,130]],
+
+  // ═══ C-101 SIDE DRAWS ═══
+  [[615,274],[378,274],[378,175]],     // LCO → C-102
+  [[615,437],[493,437],[493,365]],     // HCO → C-103
+
+  // ═══ LEFT PRODUCT LINES ═══
+  [[615,548],[600,548]],
+  [[615,617],[600,617]],
+  [[615,700],[600,700]],
+  [[410,700],[410,730]],
+  [[508,765],[508,730]],
+
+  // ═══ C-101 BOTTOMS → FURNACE ═══
+  [[615,814],[575,814],[575,1390],[367,1390]],
+  [[367,1390],[367,1348]],
+
+  // ═══ C-101 RIGHT DRAWS → SIDE COOLERS ═══
+  [[675,160],[910,160],[910,235],[2344,235]],
+  [[675,235],[940,235],[940,235]],
+  [[675,300],[970,300],[970,303],[2344,303]],
+  [[675,385],[1000,385],[1000,371],[2344,371]],
+  [[675,460],[1030,460],[1030,439],[2344,439]],
+  [[675,527],[1060,527],[1060,507],[2344,507]],
+  [[675,614],[1090,614],[1090,575],[2344,575]],
+  [[675,685],[1120,685],[1120,643],[2344,643]],
+  [[675,755],[1150,755],[1150,711],[2344,711]],
+  [[675,815],[1180,815],[1180,779],[2344,779]],
+  // Battery limit
+  [[2416,235],[2700,235]],[[2416,303],[2700,303]],[[2416,371],[2700,371]],
+  [[2416,439],[2700,439]],[[2416,507],[2700,507]],[[2416,575],[2700,575]],
+  [[2416,643],[2700,643]],[[2416,711],[2700,711]],[[2416,779],[2700,779]],
+
+  // ═══ C-104 DEBUTANIZER ═══
+  [[1086,360],[1086,186],[1313,186]],
+  [[1406,186],[1625,186]],
+  [[1086,780],[1086,912],[2010,912]],
+  [[1215,53],[1313,53]],
+
+  // ═══ C-105 ABSORBER ═══
+  [[2060,115],[2065,115],[2065,53],[2248,53]],
+  [[2060,660],[2310,660],[2310,940]],
+
+  // ═══ 11-V-107 ═══
+  [[2010,660],[2270,660],[2270,940],[2310,940]],
+
+  // ═══ V-156 / V-104 ═══
+  [[1798,90],[1870,90],[1870,235],[2010,235]],
+  [[1406,186],[1406,100],[1313,100]],
+
+  // ═══ PUMP DISCHARGE ═══
+  [[745,846],[745,795]],[[880,846],[880,795]],[[1020,846],[1020,795]],
+  [[1160,846],[1160,795]],[[1310,846],[1310,795]],[[1465,846],[1465,795]],
+  [[1606,846],[1606,795]],[[1745,846],[1745,795]],[[1895,846],[1895,795]],
+  [[2020,846],[2020,795]],
+  [[745,946],[745,896]],[[880,946],[880,896]],[[1020,946],[1020,896]],
+
+  // ═══ DESALTER → BATTERY LIMIT ═══
+  [[1956,1133],[2010,1133],[2010,1200]],
+];
+
+// LINE_NUMBERS is mutable — users can add/delete entries
+let LINE_NUMBERS = [
+  { id:'11-L-1001', desc:'Overhead Vapor Line C-101→E-110', size:'24"', spec:'CS-A',  nomThk:9.5, minAllow:3.2 },
+  { id:'11-L-1002', desc:'Reflux Return to C-101',          size:'12"', spec:'CS-A',  nomThk:7.1, minAllow:2.5 },
+  { id:'11-L-1003', desc:'LCO Product to Storage',          size:'8"',  spec:'CS-B',  nomThk:6.4, minAllow:2.5 },
+  { id:'11-L-1004', desc:'HCO Pumparound Return',           size:'10"', spec:'CS-A',  nomThk:7.1, minAllow:2.5 },
+  { id:'11-L-1005', desc:'Bottom Product to Fired Heater',  size:'16"', spec:'Cr-Mo', nomThk:9.5, minAllow:4.0 },
+  { id:'11-L-1006', desc:'Feed Line from Desalter A/B',     size:'20"', spec:'CS-A',  nomThk:9.5, minAllow:3.2 },
+  { id:'11-L-1007', desc:'Wash Water Injection to Overhead',size:'3"',  spec:'SS316', nomThk:3.9, minAllow:1.5 },
+  { id:'11-L-1008', desc:'Sour Water to Treatment',         size:'6"',  spec:'CS-B',  nomThk:5.6, minAllow:2.0 },
+  { id:'11-L-1009', desc:'LCGO Pumparound Circuit',         size:'14"', spec:'CS-A',  nomThk:8.0, minAllow:2.5 },
+  { id:'11-L-1010', desc:'Absorber Feed Gas Line',          size:'18"', spec:'CS-A',  nomThk:9.5, minAllow:3.2 },
+];
+
+// Committed inspection data
+const inspData = {};   // tag → { measured, corrRate }
+const lineData  = {};  // line id → { measured, corrRate }
+
+// Seed values
+Object.assign(inspData, {
+  'C-101':{'measured':22.1,'corrRate':0.38},'C-102':{'measured':14.5,'corrRate':0.52},
+  'C-103':{'measured':15.8,'corrRate':0.25},'C-104':{'measured':16.2,'corrRate':0.30},
+  'C-105':{'measured':18.2,'corrRate':0.15},
+  'V-102':{'measured':11.2,'corrRate':0.45},'V-103':{'measured':12.0,'corrRate':0.40},
+  'V-104':{'measured':17.8,'corrRate':0.22},'V-105':{'measured':10.5,'corrRate':0.35},
+  'V-156':{'measured':12.8,'corrRate':0.30},'11-V-107':{'measured':14.2,'corrRate':0.15},
+  'V-101A':{'measured':8.5,'corrRate':1.1},'V-101B':{'measured':10.2,'corrRate':0.48},
+  '11-F-101':{'measured':6.5,'corrRate':0.45},
+  'E-110A':{'measured':7.2,'corrRate':0.55},'E-110B':{'measured':6.8,'corrRate':0.60},
+  'E-111A':{'measured':7.5,'corrRate':0.42},'E-111B':{'measured':7.1,'corrRate':0.45},
+  'E-118A/B':{'measured':8.0,'corrRate':0.32},'E-119':{'measured':9.5,'corrRate':0.28},
+  '11-E-112':{'measured':7.0,'corrRate':0.55},'11-E-115A':{'measured':8.0,'corrRate':0.40},
+  '11-E-116 A/B':{'measured':7.2,'corrRate':0.45},'11-E-117':{'measured':8.5,'corrRate':0.30},
+  '11-E-120':{'measured':8.5,'corrRate':0.30},'11-E-121':{'measured':9.0,'corrRate':0.20},
+  '11-E-122':{'measured':7.8,'corrRate':0.85},'11-E-123':{'measured':8.2,'corrRate':0.35},
+  '11-E-124':{'measured':8.0,'corrRate':0.40},'11-E-125':{'measured':7.5,'corrRate':0.38},
+  '11-E-126':{'measured':8.8,'corrRate':0.25},'11-E-127':{'measured':9.0,'corrRate':0.22},
+  '11-E-128':{'measured':8.5,'corrRate':0.30},
+  'E-101':{'measured':9.0,'corrRate':0.32},'E-102':{'measured':8.8,'corrRate':0.35},
+  'E-103A':{'measured':8.5,'corrRate':0.38},'E-103B':{'measured':8.2,'corrRate':0.40},
+  'E-103C':{'measured':8.0,'corrRate':0.42},'E-103D':{'measured':7.8,'corrRate':0.45},
+  'E-104':{'measured':8.5,'corrRate':0.35},'E-105A':{'measured':8.0,'corrRate':0.38},
+  'E-105B':{'measured':7.8,'corrRate':0.40},'E-106':{'measured':9.5,'corrRate':0.30},
+  'E-107A':{'measured':9.2,'corrRate':0.28},'E-107B':{'measured':9.0,'corrRate':0.32},
+  'E-108':{'measured':8.8,'corrRate':0.35},'E-109':{'measured':8.5,'corrRate':0.38},
+  'E-113':{'measured':7.8,'corrRate':0.42},'E-114':{'measured':7.5,'corrRate':0.45},
+  '11-A-101':{'measured':4.1,'corrRate':0.18},
+  '11-C-110':{'measured':9.8,'corrRate':0.40},'11-C-116':{'measured':8.1,'corrRate':0.62},
+  '11-C-117':{'measured':8.5,'corrRate':0.52},'11-C-26':{'measured':7.5,'corrRate':0.48},
+  'P-101A/B':{'measured':10.5,'corrRate':0.35},'P-102A/B':{'measured':10.2,'corrRate':0.32},
+  'P-103A/B':{'measured':9.8,'corrRate':0.38},'P-104':{'measured':10.0,'corrRate':0.35},
+  'P-105A/B':{'measured':9.5,'corrRate':0.42},'P-106A/B':{'measured':9.8,'corrRate':0.38},
+  'P-107':{'measured':10.2,'corrRate':0.32},'P-108':{'measured':9.5,'corrRate':0.38},
+  'P-109A/B':{'measured':9.8,'corrRate':0.35},'P-110A/B':{'measured':10.0,'corrRate':0.32},
+  'P-111':{'measured':9.5,'corrRate':0.40},'P-112':{'measured':9.0,'corrRate':0.80},
+  'P-113A/B':{'measured':10.5,'corrRate':0.28},'P-114A/B':{'measured':10.2,'corrRate':0.30},
+  'P-115A/B':{'measured':9.8,'corrRate':0.38},'P-119A/B':{'measured':10.0,'corrRate':0.35},
+  'P-120':{'measured':10.5,'corrRate':0.30},'P-133':{'measured':9.5,'corrRate':0.42},
+});
+Object.assign(lineData, {
+  '11-L-1001':{'measured':8.8,'corrRate':0.20},'11-L-1002':{'measured':6.5,'corrRate':0.35},
+  '11-L-1003':{'measured':5.2,'corrRate':0.48},'11-L-1005':{'measured':7.1,'corrRate':0.62},
+  '11-L-1007':{'measured':2.9,'corrRate':0.35},'11-L-1009':{'measured':6.4,'corrRate':0.28},
+});
+
+
+// ════════════════════════════════════════════════
+
+//  BUSINESS LOGIC
+// ════════════════════════════════════════════════
+const SCOL = { good:'#00e676', monitor:'#ffea00', warning:'#ff9100', critical:'#ff1744', unknown:'#3a5070' };
+const SFIL = { good:'rgba(0,230,118,0.14)', monitor:'rgba(255,234,0,0.14)', warning:'rgba(255,145,0,0.14)', critical:'rgba(255,23,68,0.14)', unknown:'rgba(0,0,0,0)' };
+const STXT = { good:'SAFE', monitor:'MONITOR', warning:'WARNING', critical:'CRITICAL', unknown:'NO DATA' };
+
+function calcRL(m, r, minA) {
+  if (!m || !r || r <= 0) return null;
+  return (m - minA) / r;
+}
+function statusOf(rl) {
+  if (rl === null) return 'unknown';
+  if (rl < 2) return 'critical';
+  if (rl < 5) return 'warning';
+  if (rl < 10) return 'monitor';
+  return 'good';
+}
+function eqRL(eq) {
+  const d = inspData[eq.tag]; if (!d) return null;
+  return calcRL(d.measured, d.corrRate, eq.minAllow);
+}
+function lnRL(ln) {
+  const d = lineData[ln.id]; if (!d) return null;
+  return calcRL(d.measured, d.corrRate, ln.minAllow);
+}
+
+// ════════════════════════════════════════════════
+//  SVG / PFD
+// ════════════════════════════════════════════════
+const svg = document.getElementById('pfd');
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k,v] of Object.entries(attrs)) e.setAttribute(k,v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+
+
+function drawPipes() {
+  const g = svgEl('g',{class:'pipes'},svg);
+  PIPES.forEach(pts=>{
+    let d=`M ${pts[0][0]} ${pts[0][1]}`;
+    for(let i=1;i<pts.length;i++) d+=` L ${pts[i][0]} ${pts[i][1]}`;
+    svgEl('path',{d,class:'pipe'},g);
+  });
+}
+
+function drawEquipment() {
+  EQUIPMENT.forEach(eq=>{
+    const rl=eqRL(eq), st=statusOf(rl), col=SCOL[st], fil=SFIL[st];
+    const g=svgEl('g',{class:'eq-node'+(st==='critical'?' critical-pulse':''),id:'node-'+eq.tag},svg);
+    const t=eq.type;
+    if(t==='column'){
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:eq.w/2,ry:eq.w/2,fill:'#0d1e33',stroke:col,'stroke-width':'2',class:'eq-body'},g);
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:eq.w/2,ry:eq.w/2,fill:fil,'pointer-events':'none'},g);
+      for(let i=1;i<6;i++) svgEl('line',{x1:eq.x+3,y1:eq.y+eq.h*i/6,x2:eq.x+eq.w-3,y2:eq.y+eq.h*i/6,stroke:'rgba(255,255,255,0.07)','stroke-width':'1','pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+eq.w/2,cy:eq.y+16,r:6,fill:col,'pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+14,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+      const nm=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+24,'text-anchor':'middle',class:'eq-label'},g); nm.textContent=eq.name;
+    } else if(t==='vessel-h'){
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:eq.h/2,ry:eq.h/2,fill:'#0d1e33',stroke:col,'stroke-width':'2',class:'eq-body'},g);
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:eq.h/2,ry:eq.h/2,fill:fil,'pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+18,cy:eq.y+eq.h/2,r:5,fill:col,'pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+12,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+    } else if(t==='vessel-v'){
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:eq.w/2,ry:eq.w/2,fill:'#0d1e33',stroke:col,'stroke-width':'2',class:'eq-body'},g);
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:eq.w/2,ry:eq.w/2,fill:fil,'pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+eq.w/2,cy:eq.y+16,r:5,fill:col,'pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+12,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+    } else if(t==='hex'){
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:3,fill:'#0d1e33',stroke:col,'stroke-width':'1.5',class:'eq-body'},g);
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:3,fill:fil,'pointer-events':'none'},g);
+      svgEl('path',{d:`M${eq.x+8} ${eq.y+eq.h/2} q5,-5 10,0 q5,5 10,0 q5,-5 10,0 q5,5 10,0`,stroke:col,'stroke-width':'1',fill:'none',opacity:'0.5','pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+5,cy:eq.y+eq.h/2,r:3.5,fill:col,'pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+12,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+    } else if(t==='air-cooler'){
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:3,fill:'#0d1e33',stroke:col,'stroke-width':'1.5',class:'eq-body'},g);
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:3,fill:fil,'pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+eq.w/2,cy:eq.y+eq.h/2,r:12,stroke:col,'stroke-width':'1',fill:'none',opacity:'0.4','pointer-events':'none'},g);
+      svgEl('line',{x1:eq.x+eq.w/2-12,y1:eq.y+eq.h/2,x2:eq.x+eq.w/2+12,y2:eq.y+eq.h/2,stroke:col,'stroke-width':'1',opacity:'0.4','pointer-events':'none'},g);
+      svgEl('line',{x1:eq.x+eq.w/2,y1:eq.y+eq.h/2-12,x2:eq.x+eq.w/2,y2:eq.y+eq.h/2+12,stroke:col,'stroke-width':'1',opacity:'0.4','pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+8,cy:eq.y+8,r:3,fill:col,'pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+12,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+    } else if(t==='furnace'){
+      // Draw furnace as a rectangle with flame symbol
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:3,fill:'#1a0a00',stroke:col,'stroke-width':'2',class:'eq-body'},g);
+      svgEl('rect',{x:eq.x,y:eq.y,width:eq.w,height:eq.h,rx:3,fill:fil,'pointer-events':'none'},g);
+      // Flame symbol
+      svgEl('path',{d:`M${eq.x+eq.w/2} ${eq.y+eq.h-8} Q${eq.x+eq.w/2+10} ${eq.y+eq.h/2} ${eq.x+eq.w/2} ${eq.y+12} Q${eq.x+eq.w/2-8} ${eq.y+eq.h/2} ${eq.x+eq.w/2+6} ${eq.y+eq.h-8}`,stroke:col,'stroke-width':'1.5',fill:'none',opacity:'0.6','pointer-events':'none'},g);
+      // Tubes symbol
+      for(let i=1;i<4;i++) svgEl('line',{x1:eq.x+4,y1:eq.y+eq.h*i/4,x2:eq.x+eq.w-4,y2:eq.y+eq.h*i/4,stroke:'rgba(255,145,0,0.2)','stroke-width':'1','pointer-events':'none'},g);
+      svgEl('circle',{cx:eq.x+6,cy:eq.y+6,r:3,fill:col,'pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+14,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+      const nm=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+24,'text-anchor':'middle',class:'eq-label'},g); nm.textContent=eq.name;
+    } else if(t==='pump'){
+      svgEl('circle',{cx:eq.x+eq.w/2,cy:eq.y+eq.h/2,r:eq.w/2,fill:'#0d1e33',stroke:col,'stroke-width':'1.5',class:'eq-body'},g);
+      svgEl('circle',{cx:eq.x+eq.w/2,cy:eq.y+eq.h/2,r:eq.w/2,fill:fil,'pointer-events':'none'},g);
+      const cx=eq.x+eq.w/2, cy=eq.y+eq.h/2, r=eq.w/2-4;
+      svgEl('polygon',{points:`${cx},${cy-r} ${cx+r*0.85},${cy+r*0.5} ${cx-r*0.85},${cy+r*0.5}`,fill:col,opacity:'0.4','pointer-events':'none'},g);
+      const tx=svgEl('text',{x:eq.x+eq.w/2,y:eq.y+eq.h+12,'text-anchor':'middle',class:'eq-tag-text'},g); tx.textContent=eq.tag;
+    }
+    g.addEventListener('mouseenter', e=>showTip(e,eq));
+    g.addEventListener('mousemove',  e=>moveTip(e));
+    g.addEventListener('mouseleave', hideTip);
+    g.addEventListener('click', ()=>selectEq(eq.tag));
+  });
+}
+
+// ── Tooltip ──
+const tooltip = document.getElementById('tooltip');
+function showTip(e, eq) {
+  const d=inspData[eq.tag]||{}, rl=eqRL(eq), st=statusOf(rl), c=SCOL[st];
+  tooltip.innerHTML=`
+    <div class="tt-tag">${eq.tag}</div><div class="tt-name">${eq.name}</div>
+    <div class="tt-row"><span class="tt-key">Nom.Thk</span><span class="tt-val">${eq.nomThk} mm</span></div>
+    <div class="tt-row"><span class="tt-key">Min.Allow</span><span class="tt-val">${eq.minAllow} mm</span></div>
+    <div class="tt-row"><span class="tt-key">Measured</span><span class="tt-val">${d.measured!=null?d.measured.toFixed(2)+' mm':'—'}</span></div>
+    <div class="tt-row"><span class="tt-key">Corr.Rate</span><span class="tt-val">${d.corrRate!=null?d.corrRate.toFixed(3)+' mm/yr':'—'}</span></div>
+    <div class="tt-row"><span class="tt-key">Rem.Life</span><span class="tt-val" style="color:${c}">${rl!==null?rl.toFixed(1)+' yr':'—'}</span></div>
+    <div class="tt-status" style="background:${SFIL[st]};color:${c};border:1px solid ${c}">${STXT[st]}</div>`;
+  tooltip.style.display='block'; moveTip(e);
+}
+function moveTip(e) {
+  let x=e.clientX+14, y=e.clientY+14;
+  if(x+210>window.innerWidth) x=e.clientX-210;
+  tooltip.style.left=x+'px'; tooltip.style.top=y+'px';
+}
+function hideTip() { tooltip.style.display='none'; }
+
+// ════════════════════════════════════════════════
+//  SIDEBAR
+// ════════════════════════════════════════════════
+let selTag = null;
+
+function buildSidebar() {
+  const list = document.getElementById('eq-list');
+  const q = (document.getElementById('sb-search').value||'').toLowerCase();
+  list.innerHTML = '';
+
+  // Equipment section — sort by remaining life ascending (most critical first)
+  const eqSorted = [...EQUIPMENT]
+    .sort((a,b)=>{ const ra=eqRL(a),rb=eqRL(b); if(ra===null&&rb===null)return 0; if(ra===null)return 1; if(rb===null)return -1; return ra-rb; })
+    .filter(e=>!q||e.tag.toLowerCase().includes(q)||e.name.toLowerCase().includes(q));
+
+  if(eqSorted.length){
+    const sep=document.createElement('div'); sep.className='section-sep'; sep.textContent='Equipment Tags'; list.appendChild(sep);
+    eqSorted.forEach(eq=>{
+      const rl=eqRL(eq), st=statusOf(rl), c=SCOL[st];
+      const div=document.createElement('div');
+      div.className='eq-item'+(eq.tag===selTag?' selected':'');
+      div.innerHTML=`<div class="eq-status" style="background:${c};color:${c}"></div>
+        <div class="eq-info"><div class="eq-tag-sb">${eq.tag}</div><div class="eq-name">${eq.name}</div></div>
+        <div><div class="eq-rl" style="color:${c}">${rl!==null?rl.toFixed(1):'—'}</div><div class="eq-rl-lbl">YRS</div></div>`;
+      div.addEventListener('click',()=>selectEq(eq.tag));
+      list.appendChild(div);
+    });
+  }
+
+  // Line numbers section
+  const lnSorted = [...LINE_NUMBERS]
+    .sort((a,b)=>{ const ra=lnRL(a),rb=lnRL(b); if(ra===null&&rb===null)return 0; if(ra===null)return 1; if(rb===null)return -1; return ra-rb; })
+    .filter(l=>!q||l.id.toLowerCase().includes(q)||l.desc.toLowerCase().includes(q));
+
+  if(lnSorted.length){
+    const sep=document.createElement('div'); sep.className='section-sep'; sep.textContent='Line Numbers'; list.appendChild(sep);
+    lnSorted.forEach(ln=>{
+      const rl=lnRL(ln), st=statusOf(rl), c=SCOL[st];
+      const div=document.createElement('div');
+      div.className='eq-item'+(ln.id===selTag?' selected':'');
+      div.innerHTML=`<div class="eq-status" style="background:${c};color:${c}"></div>
+        <div class="eq-info"><div class="eq-tag-sb">${ln.id}</div><div class="eq-name">${ln.desc}</div></div>
+        <div><div class="eq-rl" style="color:${c}">${rl!==null?rl.toFixed(1):'—'}</div><div class="eq-rl-lbl">YRS</div></div>`;
+      div.addEventListener('click',()=>selectLn(ln.id));
+      list.appendChild(div);
+    });
+  }
+
+  updateStats();
+}
+
+function updateStats() {
+  let good=0,mon=0,warn=0,crit=0,total=0;
+  EQUIPMENT.forEach(eq=>{ total++; const s=statusOf(eqRL(eq)); if(s==='good')good++; else if(s==='monitor')mon++; else if(s==='warning')warn++; else if(s==='critical')crit++; });
+  LINE_NUMBERS.forEach(ln=>{ total++; const s=statusOf(lnRL(ln)); if(s==='good')good++; else if(s==='monitor')mon++; else if(s==='warning')warn++; else if(s==='critical')crit++; });
+  document.getElementById('hs-total').textContent=total;
+  document.getElementById('hs-good').textContent=good;
+  document.getElementById('hs-mon').textContent=mon;
+  document.getElementById('hs-warn').textContent=warn;
+  document.getElementById('hs-crit').textContent=crit;
+}
+
+function selectEq(tag) {
+  selTag=tag;
+  const eq=EQUIPMENT.find(e=>e.tag===tag); if(!eq) return;
+  buildInputPanelEq(eq); buildSidebar(); highlightPFD(tag);
+}
+function selectLn(id) {
+  selTag=id;
+  const ln=LINE_NUMBERS.find(l=>l.id===id); if(!ln) return;
+  buildInputPanelLn(ln); buildSidebar();
+  // Clear PFD highlight
+  EQUIPMENT.forEach(eq=>{ const nd=svg.getElementById('node-'+eq.tag); if(!nd)return; const b=nd.querySelector('.eq-body'); if(b){ b.setAttribute('stroke-width',eq.type==='hex'?'1.5':'2'); b.removeAttribute('filter'); }});
+}
+function highlightPFD(tag) {
+  EQUIPMENT.forEach(eq=>{ const nd=svg.getElementById('node-'+eq.tag); if(!nd)return; const b=nd.querySelector('.eq-body'); if(!b)return;
+    if(eq.tag===tag){ b.setAttribute('stroke-width','3'); b.setAttribute('filter','url(#glow)'); }
+    else { b.setAttribute('stroke-width',eq.type==='hex'?'1.5':'2'); b.removeAttribute('filter'); }
+  });
+}
+
+// ── Single entry panel (equipment) ──
+function buildInputPanelEq(eq) {
+  const d=inspData[eq.tag]||{};
+  const rl=eqRL(eq), st=statusOf(rl), c=SCOL[st];
+  document.getElementById('input-area').innerHTML=`
+    <span class="sel-tag">${eq.tag}</span>
+    <div style="font-size:0.65rem;color:var(--dim);margin-bottom:10px">${eq.name}</div>
+    <div class="field"><label>Nom. Thickness</label><div class="field-row"><input type="number" value="${eq.nomThk}" disabled style="opacity:.45"/><span class="unit">mm</span></div></div>
+    <div class="field"><label>Min. Allowable</label><div class="field-row"><input type="number" value="${eq.minAllow}" disabled style="opacity:.45"/><span class="unit">mm</span></div></div>
+    <div class="field"><label>Measured Thickness</label><div class="field-row"><input id="inp-m" type="number" value="${d.measured||''}" step="0.01" min="0" placeholder="e.g. 18.5"/><span class="unit">mm</span></div></div>
+    <div class="field"><label>Corrosion Rate</label><div class="field-row"><input id="inp-r" type="number" value="${d.corrRate||''}" step="0.001" min="0" placeholder="e.g. 0.25"/><span class="unit">mm/y</span></div></div>
+    <div class="calc-row"><div class="calc-lbl">Remaining Life</div><div class="calc-val" id="calc-rl" style="color:${c}">${rl!==null?rl.toFixed(2)+' yrs':'—'}</div></div>
+    <button class="btn-save" onclick="saveSingleEq('${eq.tag}')">SAVE &amp; UPDATE</button>`;
+  ['inp-m','inp-r'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>liveCalc(eq.minAllow)));
+}
+// ── Single entry panel (line) ──
+function buildInputPanelLn(ln) {
+  const d=lineData[ln.id]||{};
+  const rl=lnRL(ln), st=statusOf(rl), c=SCOL[st];
+  document.getElementById('input-area').innerHTML=`
+    <span class="sel-tag">${ln.id}</span>
+    <div style="font-size:0.65rem;color:var(--dim);margin-bottom:6px">${ln.desc}</div>
+    <div style="font-size:0.62rem;color:var(--dim);margin-bottom:10px">Size: ${ln.size} | Spec: ${ln.spec}</div>
+    <div class="field"><label>Nom. Thickness</label><div class="field-row"><input type="number" value="${ln.nomThk}" disabled style="opacity:.45"/><span class="unit">mm</span></div></div>
+    <div class="field"><label>Min. Allowable</label><div class="field-row"><input type="number" value="${ln.minAllow}" disabled style="opacity:.45"/><span class="unit">mm</span></div></div>
+    <div class="field"><label>Measured Thickness</label><div class="field-row"><input id="inp-m" type="number" value="${d.measured||''}" step="0.01" min="0" placeholder="e.g. 8.0"/><span class="unit">mm</span></div></div>
+    <div class="field"><label>Corrosion Rate</label><div class="field-row"><input id="inp-r" type="number" value="${d.corrRate||''}" step="0.001" min="0" placeholder="e.g. 0.30"/><span class="unit">mm/y</span></div></div>
+    <div class="calc-row"><div class="calc-lbl">Remaining Life</div><div class="calc-val" id="calc-rl" style="color:${c}">${rl!==null?rl.toFixed(2)+' yrs':'—'}</div></div>
+    <button class="btn-save" onclick="saveSingleLn('${ln.id}')">SAVE &amp; UPDATE</button>`;
+  ['inp-m','inp-r'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>liveCalc(ln.minAllow)));
+}
+function liveCalc(minAllow) {
+  const m=parseFloat(document.getElementById('inp-m')?.value);
+  const r=parseFloat(document.getElementById('inp-r')?.value);
+  const el=document.getElementById('calc-rl'); if(!el) return;
+  if(m&&r&&r>0){ const rl=(m-minAllow)/r; el.textContent=rl.toFixed(2)+' yrs'; el.style.color=SCOL[statusOf(rl)]; }
+  else { el.textContent='—'; el.style.color='var(--dim)'; }
+}
+function saveSingleEq(tag) {
+  const m=parseFloat(document.getElementById('inp-m')?.value);
+  const r=parseFloat(document.getElementById('inp-r')?.value);
+  if(!m||!r){ alert('Enter both Measured Thickness and Corrosion Rate.'); return; }
+  inspData[tag]={measured:m,corrRate:r};
+  fullRender(); buildInputPanelEq(EQUIPMENT.find(e=>e.tag===tag)); highlightPFD(tag);
+  flashSave();
+  // Sync ke API
+  if(window.API_URL) {
+    fetch(`${window.API_URL}/api/equipment/${encodeURIComponent(tag)}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ measured_thickness:m, corrosion_rate:r })
+    }).then(res=>{ if(!res.ok) throw new Error(res.status); setApiStatus('online'); })
+      .catch(()=>setApiStatus('error'));
+  }
+}
+function saveSingleLn(id) {
+  const m=parseFloat(document.getElementById('inp-m')?.value);
+  const r=parseFloat(document.getElementById('inp-r')?.value);
+  if(!m||!r){ alert('Enter both Measured Thickness and Corrosion Rate.'); return; }
+  lineData[id]={measured:m,corrRate:r};
+  buildSidebar(); buildInputPanelLn(LINE_NUMBERS.find(l=>l.id===id));
+  flashSave();
+  // Sync ke API
+  if(window.API_URL) {
+    fetch(`${window.API_URL}/api/lines/${encodeURIComponent(id)}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ measured_thickness:m, corrosion_rate:r })
+    }).then(res=>{ if(!res.ok) throw new Error(res.status); setApiStatus('online'); })
+      .catch(()=>setApiStatus('error'));
+  }
+}
+function flashSave() {
+  const b=document.querySelector('.btn-save');
+  if(b){ b.textContent='✓ SAVED'; b.style.background='var(--good)';
+    setTimeout(()=>{ b.textContent='SAVE & UPDATE'; b.style.background='var(--accent)'; },1300); }
+}
+
+// ════════════════════════════════════════════════
+//  BULK INPUT MODAL STATE
+// ════════════════════════════════════════════════
+let curTab = 'equipment';
+let filterSt = 'all';
+// Pending edits — mirrors of committed data, modified in the modal
+let pendEq = {};   // tag → { measured, corrRate }
+let pendLn = {};   // id  → { measured, corrRate }
+// New custom rows added via "Add Row"
+let newEqRows  = [];  // { _id, tag, name, nomThk, minAllow, measured, corrRate }
+let newLnRows  = [];  // { _id, id, desc, size, spec, nomThk, minAllow, measured, corrRate }
+let _uid = 1000;
+
+function openBulkModal(tab) {
+  // Copy committed data into pending buffers
+  pendEq={}; EQUIPMENT.forEach(eq=>{ if(inspData[eq.tag]) pendEq[eq.tag]={...inspData[eq.tag]}; });
+  pendLn={}; LINE_NUMBERS.forEach(ln=>{ if(lineData[ln.id]) pendLn[ln.id]={...lineData[ln.id]}; });
+  newEqRows=[]; newLnRows=[];
+  filterSt='all';
+  document.getElementById('modal-search').value='';
+  document.getElementById('bulk-modal').classList.add('open');
+  switchTab(tab);
+}
+function closeModal() { document.getElementById('bulk-modal').classList.remove('open'); }
+document.getElementById('bulk-modal').addEventListener('click', e=>{ if(e.target.id==='bulk-modal') closeModal(); });
+
+function switchTab(tab) {
+  curTab=tab;
+  document.getElementById('tab-equipment').classList.toggle('active', tab==='equipment');
+  document.getElementById('tab-lines').classList.toggle('active', tab==='lines');
+  document.getElementById('add-row-btn').textContent = tab==='equipment'
+    ? '＋  Add Custom Equipment Tag'
+    : '＋  Add New Line Number';
+  buildTableHeader();
+  renderTable();
+}
+
+function setFilter(f) {
+  filterSt=f;
+  ['all','good','monitor','warning','critical','nodata'].forEach(p=>{
+    document.getElementById('pill-'+p).classList.toggle('on', p===f);
+  });
+  renderTable();
+}
+
+// ── TABLE HEADERS ──
+function buildTableHeader() {
+  const thead = document.getElementById('bulk-thead');
+  if(curTab==='equipment'){
+    thead.innerHTML=`<tr>
+      <th class="num">#</th>
+      <th>Tag Number</th>
+      <th>Equipment Name</th>
+      <th style="text-align:right;padding-right:12px">Nom.Thk<br><span style="font-weight:300">(mm)</span></th>
+      <th style="text-align:right;padding-right:12px">Min.Allow<br><span style="font-weight:300">(mm)</span></th>
+      <th>Measured Thk <span style="font-weight:300">(mm)</span></th>
+      <th>Corr. Rate <span style="font-weight:300">(mm/yr)</span></th>
+      <th style="text-align:right;padding-right:10px">Rem. Life<br><span style="font-weight:300">(years)</span></th>
+      <th>Status</th>
+      <th style="width:36px;text-align:center">Del</th></tr>`;
+  } else {
+    thead.innerHTML=`<tr>
+      <th class="num">#</th>
+      <th>Line Number</th>
+      <th>Description</th>
+      <th>Size</th>
+      <th>Spec</th>
+      <th style="text-align:right;padding-right:12px">Nom.Thk<br><span style="font-weight:300">(mm)</span></th>
+      <th style="text-align:right;padding-right:12px">Min.Allow<br><span style="font-weight:300">(mm)</span></th>
+      <th>Measured Thk <span style="font-weight:300">(mm)</span></th>
+      <th>Corr. Rate <span style="font-weight:300">(mm/yr)</span></th>
+      <th style="text-align:right;padding-right:10px">Rem. Life<br><span style="font-weight:300">(years)</span></th>
+      <th>Status</th>
+      <th style="width:36px;text-align:center">Del</th></tr>`;
+  }
+}
+
+// ── RENDER TABLE BODY ──
+function renderTable() {
+  const tbody = document.getElementById('bulk-tbody');
+  tbody.innerHTML = '';
+  const q = (document.getElementById('modal-search').value||'').toLowerCase();
+  curTab==='equipment' ? renderEqRows(tbody,q) : renderLnRows(tbody,q);
+  updateSaveSummary();
+}
+
+function passFilter(st, d) {
+  if(filterSt==='all') return true;
+  if(filterSt==='nodata') return (!d||(!d.measured&&!d.corrRate));
+  return st===filterSt;
+}
+
+// ── Equipment rows ──
+function renderEqRows(tbody, q) {
+  let n=0;
+  EQUIPMENT.forEach(eq=>{
+    const d = pendEq[eq.tag]||{};
+    const rl=calcRL(d.measured,d.corrRate,eq.minAllow), st=statusOf(rl), c=SCOL[st];
+    if(!passFilter(st,d)) return;
+    if(q&&!eq.tag.toLowerCase().includes(q)&&!eq.name.toLowerCase().includes(q)) return;
+    n++;
+    const orig=inspData[eq.tag]||{};
+    const changed=(d.measured!==orig.measured||d.corrRate!==orig.corrRate)&&(d.measured||d.corrRate);
+    const tr=document.createElement('tr');
+    tr.className=changed?'row-modified':''; tr.dataset.tag=eq.tag;
+    tr.innerHTML=`
+      <td class="td-num">${n}</td>
+      <td class="td-tag-cell">${eq.tag}</td>
+      <td class="td-name-cell" title="${eq.name}">${eq.name}</td>
+      <td class="td-fixed">${eq.nomThk}</td>
+      <td class="td-fixed">${eq.minAllow}</td>
+      <td><input class="cell-input${changed?' changed':''}" type="number" step="0.01" min="0" placeholder="—" value="${d.measured!=null?d.measured:''}" data-id="${eq.tag}" data-key="measured" data-minallow="${eq.minAllow}" data-mode="eq"/></td>
+      <td><input class="cell-input${changed?' changed':''}" type="number" step="0.001" min="0" placeholder="—" value="${d.corrRate!=null?d.corrRate:''}" data-id="${eq.tag}" data-key="corrRate" data-minallow="${eq.minAllow}" data-mode="eq"/></td>
+      <td class="td-rl" id="rl-eq-${eq.tag.replace(/[^a-z0-9]/gi,'_')}" style="color:${c}">${rl!==null?rl.toFixed(2):'—'}</td>
+      <td class="td-status"><span class="st-badge" id="st-eq-${eq.tag.replace(/[^a-z0-9]/gi,'_')}" style="color:${c};background:${SFIL[st]};padding:2px 6px;border-radius:2px;border:1px solid ${c}">${STXT[st]}</span></td>
+      <td style="text-align:center"><button class="row-del" disabled title="Standard equipment cannot be removed">✕</button></td>`;
+    tbody.appendChild(tr);
+    attachStdListeners(tr);
+  });
+
+  // New custom equipment rows
+  newEqRows.forEach(row=>{
+    const minA=parseFloat(row.minAllow)||0;
+    const rl=calcRL(row.measured,row.corrRate,minA), st=statusOf(rl), c=SCOL[st];
+    if(q&&!row.tag.toLowerCase().includes(q)&&!row.name.toLowerCase().includes(q)) return;
+    n++;
+    const tr=document.createElement('tr');
+    tr.className='row-new'; tr.dataset.uid=row._id;
+    tr.innerHTML=`
+      <td class="td-num">${n}</td>
+      <td><input class="cell-input cinp-md" type="text" placeholder="TAG-XXX" value="${row.tag}" data-uid="${row._id}" data-key="tag" data-mode="new-eq"/></td>
+      <td><input class="cell-input cinp-lg" type="text" placeholder="Equipment name" value="${row.name}" data-uid="${row._id}" data-key="name" data-mode="new-eq"/></td>
+      <td><input class="cell-input cinp-sm" type="number" step="0.1" placeholder="mm" value="${row.nomThk||''}" data-uid="${row._id}" data-key="nomThk" data-mode="new-eq"/></td>
+      <td><input class="cell-input cinp-sm" type="number" step="0.1" placeholder="mm" value="${row.minAllow||''}" data-uid="${row._id}" data-key="minAllow" data-mode="new-eq"/></td>
+      <td><input class="cell-input changed" type="number" step="0.01" min="0" placeholder="—" value="${row.measured!=null?row.measured:''}" data-uid="${row._id}" data-key="measured" data-mode="new-eq"/></td>
+      <td><input class="cell-input changed" type="number" step="0.001" min="0" placeholder="—" value="${row.corrRate!=null?row.corrRate:''}" data-uid="${row._id}" data-key="corrRate" data-mode="new-eq"/></td>
+      <td class="td-rl" id="rl-neq-${row._id}" style="color:${c}">${rl!==null?rl.toFixed(2):'—'}</td>
+      <td class="td-status"><span id="st-neq-${row._id}" style="color:${c};background:${SFIL[st]};padding:2px 6px;border-radius:2px;border:1px solid ${c}">${STXT[st]}</span></td>
+      <td style="text-align:center"><button class="row-del" onclick="deleteNewEqRow(${row._id})">✕</button></td>`;
+    tbody.appendChild(tr);
+    attachNewRowListeners(tr);
+  });
+}
+
+// ── Line rows ──
+function renderLnRows(tbody, q) {
+  let n=0;
+  LINE_NUMBERS.forEach(ln=>{
+    const d=pendLn[ln.id]||{};
+    const rl=calcRL(d.measured,d.corrRate,ln.minAllow), st=statusOf(rl), c=SCOL[st];
+    if(!passFilter(st,d)) return;
+    if(q&&!ln.id.toLowerCase().includes(q)&&!ln.desc.toLowerCase().includes(q)) return;
+    n++;
+    const orig=lineData[ln.id]||{};
+    const changed=(d.measured!==orig.measured||d.corrRate!==orig.corrRate)&&(d.measured||d.corrRate);
+    const safeId=ln.id.replace(/[^a-z0-9]/gi,'_');
+    const tr=document.createElement('tr');
+    tr.className=changed?'row-modified':''; tr.dataset.lid=ln.id;
+    tr.innerHTML=`
+      <td class="td-num">${n}</td>
+      <td class="td-tag-cell">${ln.id}</td>
+      <td class="td-name-cell" title="${ln.desc}">${ln.desc}</td>
+      <td style="color:var(--dim);font-size:0.68rem;white-space:nowrap">${ln.size}</td>
+      <td style="color:var(--dim);font-size:0.68rem">${ln.spec}</td>
+      <td class="td-fixed">${ln.nomThk}</td>
+      <td class="td-fixed">${ln.minAllow}</td>
+      <td><input class="cell-input${changed?' changed':''}" type="number" step="0.01" min="0" placeholder="—" value="${d.measured!=null?d.measured:''}" data-id="${ln.id}" data-key="measured" data-minallow="${ln.minAllow}" data-mode="ln"/></td>
+      <td><input class="cell-input${changed?' changed':''}" type="number" step="0.001" min="0" placeholder="—" value="${d.corrRate!=null?d.corrRate:''}" data-id="${ln.id}" data-key="corrRate" data-minallow="${ln.minAllow}" data-mode="ln"/></td>
+      <td class="td-rl" id="rl-ln-${safeId}" style="color:${c}">${rl!==null?rl.toFixed(2):'—'}</td>
+      <td class="td-status"><span id="st-ln-${safeId}" style="color:${c};background:${SFIL[st]};padding:2px 6px;border-radius:2px;border:1px solid ${c}">${STXT[st]}</span></td>
+      <td style="text-align:center"><button class="row-del" onclick="deleteLnRow('${ln.id}')">✕</button></td>`;
+    tbody.appendChild(tr);
+    attachStdListeners(tr);
+  });
+
+  // New custom line rows
+  newLnRows.forEach(row=>{
+    const minA=parseFloat(row.minAllow)||0;
+    const rl=calcRL(row.measured,row.corrRate,minA), st=statusOf(rl), c=SCOL[st];
+    if(q&&!row.id.toLowerCase().includes(q)&&!row.desc.toLowerCase().includes(q)) return;
+    n++;
+    const tr=document.createElement('tr');
+    tr.className='row-new'; tr.dataset.uid=row._id;
+    tr.innerHTML=`
+      <td class="td-num">${n}</td>
+      <td><input class="cell-input cinp-md" type="text" placeholder="11-L-XXXX" value="${row.id}" data-uid="${row._id}" data-key="id" data-mode="new-ln"/></td>
+      <td><input class="cell-input cinp-lg" type="text" placeholder="Line description" value="${row.desc}" data-uid="${row._id}" data-key="desc" data-mode="new-ln"/></td>
+      <td><input class="cell-input cinp-xs" type="text" placeholder='10"' value="${row.size}" data-uid="${row._id}" data-key="size" data-mode="new-ln"/></td>
+      <td><input class="cell-input cinp-xs" type="text" placeholder="CS-A" value="${row.spec}" data-uid="${row._id}" data-key="spec" data-mode="new-ln"/></td>
+      <td><input class="cell-input cinp-sm" type="number" step="0.1" placeholder="mm" value="${row.nomThk||''}" data-uid="${row._id}" data-key="nomThk" data-mode="new-ln"/></td>
+      <td><input class="cell-input cinp-sm" type="number" step="0.1" placeholder="mm" value="${row.minAllow||''}" data-uid="${row._id}" data-key="minAllow" data-mode="new-ln"/></td>
+      <td><input class="cell-input changed" type="number" step="0.01" min="0" placeholder="—" value="${row.measured!=null?row.measured:''}" data-uid="${row._id}" data-key="measured" data-mode="new-ln"/></td>
+      <td><input class="cell-input changed" type="number" step="0.001" min="0" placeholder="—" value="${row.corrRate!=null?row.corrRate:''}" data-uid="${row._id}" data-key="corrRate" data-mode="new-ln"/></td>
+      <td class="td-rl" id="rl-nln-${row._id}" style="color:${c}">${rl!==null?rl.toFixed(2):'—'}</td>
+      <td class="td-status"><span id="st-nln-${row._id}" style="color:${c};background:${SFIL[st]};padding:2px 6px;border-radius:2px;border:1px solid ${c}">${STXT[st]}</span></td>
+      <td style="text-align:center"><button class="row-del" onclick="deleteNewLnRow(${row._id})">✕</button></td>`;
+    tbody.appendChild(tr);
+    attachNewRowListeners(tr);
+  });
+}
+
+// ── Listeners for standard rows (existing tags/lines) ──
+function attachStdListeners(tr) {
+  tr.querySelectorAll('.cell-input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const mode=inp.dataset.mode, id=inp.dataset.id, key=inp.dataset.key;
+      const minA=parseFloat(inp.dataset.minallow)||0;
+      const val=inp.type==='number'? (parseFloat(inp.value)||null) : inp.value;
+      if(mode==='eq'){ if(!pendEq[id]) pendEq[id]={}; pendEq[id][key]=val; }
+      else            { if(!pendLn[id]) pendLn[id]={}; pendLn[id][key]=val; }
+      inp.classList.add('changed'); tr.classList.add('row-modified');
+      // Inline RL update
+      const pend=(mode==='eq'?pendEq:pendLn)[id]||{};
+      updateInlineRL(id, pend.measured, pend.corrRate, minA, mode);
+      updateSaveSummary();
+    });
+    inp.addEventListener('keydown', e=>{ if(e.key==='Tab'&&!e.shiftKey||e.key==='Enter'){ e.preventDefault(); focusDown(inp); }});
+  });
+}
+
+// ── Listeners for new custom rows ──
+function attachNewRowListeners(tr) {
+  tr.querySelectorAll('.cell-input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const uid=parseInt(inp.dataset.uid), key=inp.dataset.key, mode=inp.dataset.mode;
+      const arr=(mode==='new-eq')?newEqRows:newLnRows;
+      const row=arr.find(r=>r._id===uid); if(!row) return;
+      row[key] = inp.type==='number'? (parseFloat(inp.value)||null) : inp.value;
+      const minA=parseFloat(row.minAllow)||0;
+      const prefix=(mode==='new-eq')?'rl-neq-':'rl-nln-';
+      const stPfx=(mode==='new-eq')?'st-neq-':'st-nln-';
+      const rl=calcRL(row.measured,row.corrRate,minA), st=statusOf(rl), c=SCOL[st];
+      const rlEl=document.getElementById(prefix+uid); if(rlEl){ rlEl.textContent=rl!==null?rl.toFixed(2):'—'; rlEl.style.color=c; }
+      const stEl=document.getElementById(stPfx+uid); if(stEl){ stEl.textContent=STXT[st]; stEl.style.color=c; stEl.style.background=SFIL[st]; stEl.style.borderColor=c; }
+      updateSaveSummary();
+    });
+    inp.addEventListener('keydown', e=>{ if(e.key==='Tab'&&!e.shiftKey||e.key==='Enter'){ e.preventDefault(); focusDown(inp); }});
+  });
+}
+
+// Update inline RL/status cells for standard rows
+function updateInlineRL(id, m, r, minA, mode) {
+  const rl=calcRL(m,r,minA), st=statusOf(rl), c=SCOL[st];
+  const safe=id.replace(/[^a-z0-9]/gi,'_');
+  const prefix=(mode==='eq')?'rl-eq-':'rl-ln-';
+  const stPfx=(mode==='eq')?'st-eq-':'st-ln-';
+  const rlEl=document.getElementById(prefix+safe); if(rlEl){ rlEl.textContent=rl!==null?rl.toFixed(2):'—'; rlEl.style.color=c; }
+  const stEl=document.getElementById(stPfx+safe); if(stEl){ stEl.textContent=STXT[st]; stEl.style.color=c; stEl.style.background=SFIL[st]; stEl.style.borderColor=c; }
+}
+
+// Tab/Enter: move focus down within the same column index
+function focusDown(inp) {
+  const tr=inp.closest('tr');
+  const rowInputs=Array.from(tr.querySelectorAll('.cell-input'));
+  const colIdx=rowInputs.indexOf(inp);
+  const nextTr=tr.nextElementSibling;
+  if(nextTr){ const ni=Array.from(nextTr.querySelectorAll('.cell-input')); if(ni[colIdx]) ni[colIdx].focus(); else if(ni.length) ni[0].focus(); }
+}
+
+// ── Add new row ──
+function addCustomRow() {
+  const uid=_uid++;
+  if(curTab==='equipment') newEqRows.push({_id:uid,tag:'',name:'',nomThk:'',minAllow:'',measured:null,corrRate:null});
+  else                     newLnRows.push({_id:uid,id:'',desc:'',size:'',spec:'CS-A',nomThk:'',minAllow:'',measured:null,corrRate:null});
+  renderTable();
+  document.getElementById('modal-body').scrollTop=99999;
+  // Focus first input of the new row
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('#bulk-tbody tr.row-new');
+    if(rows.length){ const inp=rows[rows.length-1].querySelector('.cell-input'); if(inp) inp.focus(); }
+  },50);
+}
+
+function deleteLnRow(id) {
+  if(!confirm(`Delete line ${id} and all its inspection data?`)) return;
+  LINE_NUMBERS=LINE_NUMBERS.filter(l=>l.id!==id);
+  delete lineData[id]; delete pendLn[id];
+  renderTable(); buildSidebar();
+}
+function deleteNewEqRow(uid){ newEqRows=newEqRows.filter(r=>r._id!==uid); renderTable(); }
+function deleteNewLnRow(uid){ newLnRows=newLnRows.filter(r=>r._id!==uid); renderTable(); }
+
+// ── Save summary ──
+function updateSaveSummary() {
+  let mod=0, added=0;
+  if(curTab==='equipment'){
+    EQUIPMENT.forEach(eq=>{ const p=pendEq[eq.tag]||{}, o=inspData[eq.tag]||{}; if((p.measured||p.corrRate)&&(p.measured!==o.measured||p.corrRate!==o.corrRate)) mod++; });
+    added=newEqRows.filter(r=>r.tag&&(r.measured||r.corrRate)).length;
+  } else {
+    LINE_NUMBERS.forEach(ln=>{ const p=pendLn[ln.id]||{}, o=lineData[ln.id]||{}; if((p.measured||p.corrRate)&&(p.measured!==o.measured||p.corrRate!==o.corrRate)) mod++; });
+    added=newLnRows.filter(r=>(r.id||r.tag)&&(r.measured||r.corrRate)).length;
+  }
+  const total=mod+added;
+  const el=document.getElementById('save-summary');
+  el.innerHTML=total===0
+    ? 'No pending changes.'
+    : `<strong style="color:var(--monitor)">${total} pending change${total!==1?'s':''}</strong> — ${mod} modified, ${added} new. Click <em>Save All</em> to commit to map.`;
+}
+
+function discardChanges() {
+  pendEq={}; pendLn={};
+  EQUIPMENT.forEach(eq=>{ if(inspData[eq.tag]) pendEq[eq.tag]={...inspData[eq.tag]}; });
+  LINE_NUMBERS.forEach(ln=>{ if(lineData[ln.id]) pendLn[ln.id]={...lineData[ln.id]}; });
+  newEqRows=[]; newLnRows=[];
+  renderTable();
+}
+
+// ── Save all & commit ──
+function saveAllBulk() {
+  let saved=0;
+  // Commit equipment pending data
+  Object.entries(pendEq).forEach(([tag,d])=>{
+    if(d.measured!=null&&d.corrRate!=null){ inspData[tag]={measured:d.measured,corrRate:d.corrRate}; saved++; }
+  });
+  // Commit line pending data
+  Object.entries(pendLn).forEach(([id,d])=>{
+    if(d.measured!=null&&d.corrRate!=null){ lineData[id]={measured:d.measured,corrRate:d.corrRate}; saved++; }
+  });
+  // Commit new equipment rows
+  newEqRows.forEach(row=>{
+    if(!row.tag) return;
+    if(!EQUIPMENT.find(e=>e.tag===row.tag)&&row.nomThk&&row.minAllow)
+      EQUIPMENT.push({tag:row.tag,name:row.name||'(custom)',type:'vessel-h',x:50,y:50,w:60,h:30,nomThk:parseFloat(row.nomThk),minAllow:parseFloat(row.minAllow)});
+    if(row.measured!=null&&row.corrRate!=null){ inspData[row.tag]={measured:row.measured,corrRate:row.corrRate}; saved++; }
+  });
+  // Commit new line rows
+  newLnRows.forEach(row=>{
+    if(!row.id) return;
+    if(!LINE_NUMBERS.find(l=>l.id===row.id)&&row.nomThk&&row.minAllow)
+      LINE_NUMBERS.push({id:row.id,desc:row.desc||'(custom)',size:row.size||'?',spec:row.spec||'CS-A',nomThk:parseFloat(row.nomThk),minAllow:parseFloat(row.minAllow)});
+    if(row.measured!=null&&row.corrRate!=null){ lineData[row.id]={measured:row.measured,corrRate:row.corrRate}; saved++; }
+  });
+
+  fullRender();
+  closeModal();
+
+  const banner=document.createElement('div');
+  banner.style.cssText='position:fixed;bottom:22px;right:22px;background:#0f1520;border:1px solid var(--good);color:var(--good);font-family:Barlow Condensed,sans-serif;font-size:0.88rem;font-weight:700;letter-spacing:2px;padding:11px 20px;border-radius:4px;z-index:9999;box-shadow:0 4px 20px rgba(0,230,118,0.18)';
+  banner.textContent=`✓ ${saved} RECORDS COMMITTED — MAP UPDATED`;
+  document.body.appendChild(banner);
+  setTimeout(()=>banner.remove(),2800);
+}
+
+// ════════════════════════════════════════════════
+//  PASTE FROM EXCEL (Ctrl+V)
+//  Expected columns: Measured Thickness [tab] Corrosion Rate
+//  Rows will map to the currently visible table rows in order
+// ════════════════════════════════════════════════
+document.getElementById('bulk-modal').addEventListener('paste', e=>{
+  if(document.activeElement?.classList.contains('cell-input')) return; // let normal paste work in cells
+  e.preventDefault();
+  const text=e.clipboardData.getData('text/plain');
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return;
+  const visRows=Array.from(document.querySelectorAll('#bulk-tbody tr'));
+  let pasted=0;
+  lines.forEach((line,i)=>{
+    const cols=line.split('\t');
+    const m=parseFloat(cols[0]), r=parseFloat(cols[1]);
+    if(isNaN(m)&&isNaN(r)) return;
+    const tr=visRows[i]; if(!tr) return;
+    if(tr.dataset.tag){
+      const tag=tr.dataset.tag, eq=EQUIPMENT.find(e=>e.tag===tag);
+      if(!pendEq[tag]) pendEq[tag]={};
+      if(!isNaN(m)) pendEq[tag].measured=m;
+      if(!isNaN(r)) pendEq[tag].corrRate=r;
+      pasted++;
+    } else if(tr.dataset.lid){
+      const id=tr.dataset.lid;
+      if(!pendLn[id]) pendLn[id]={};
+      if(!isNaN(m)) pendLn[id].measured=m;
+      if(!isNaN(r)) pendLn[id].corrRate=r;
+      pasted++;
+    }
+  });
+  renderTable();
+  if(pasted>0) showFlash(`⇩ PASTED ${pasted} ROWS FROM CLIPBOARD`, 'var(--accent)');
+});
+
+function showFlash(msg, col) {
+  const el=document.createElement('div');
+  el.style.cssText=`position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid ${col};color:${col};font-family:Barlow Condensed,sans-serif;font-size:0.82rem;letter-spacing:2px;padding:9px 16px;border-radius:4px;z-index:9999;`;
+  el.textContent=msg; document.body.appendChild(el);
+  setTimeout(()=>el.remove(),2000);
+}
+
+// ════════════════════════════════════════════════
+//  FULL RENDER (PFD + sidebar)
+// ════════════════════════════════════════════════
+function fullRender() {
+  svg.innerHTML='';
+  const defs=svgEl('defs',{},svg);
+  const filt=svgEl('filter',{id:'glow',x:'-50%',y:'-50%',width:'200%',height:'200%'},defs);
+  svgEl('feGaussianBlur',{stdDeviation:'3',result:'blur'},filt);
+  const merge=svgEl('feMerge',{},filt);
+  svgEl('feMergeNode',{in:'blur'},merge); svgEl('feMergeNode',{in:'SourceGraphic'},merge);
+  drawPipes();
+  drawEquipment();
+  buildSidebar();
+}
+
+// ── Init ──
+fullRender(); // initial render with seed data
+
+
+
+// ════════════════════════════════════════════════
+//  ZOOM & PAN LOGIC
+// ════════════════════════════════════════════════
+(function(){
+  const wrap = document.querySelector('.canvas-wrap');
+  const pfdWrap = document.getElementById('pfd-transform-wrap');
+  const zoomDisplay = document.getElementById('zoom-level-display');
+  const zoomBox = document.getElementById('zoom-box');
+
+  let scale = 0.38;  // start zoomed out to show full PFD
+  let panX = 0, panY = 0;
+  let isDragging = false, dragStartX, dragStartY, panStartX, panStartY;
+  let isBoxMode = false, boxStartX, boxStartY, boxing = false;
+
+  function applyTransform() {
+    pfdWrap.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    zoomDisplay.textContent = Math.round(scale*100)+'%';
+  }
+  applyTransform();
+
+  // Zoom in/out buttons
+  document.getElementById('zoom-in-btn').addEventListener('click', ()=>{
+    scale = Math.min(scale * 1.25, 4);
+    applyTransform();
+  });
+  document.getElementById('zoom-out-btn').addEventListener('click', ()=>{
+    scale = Math.max(scale / 1.25, 0.08);
+    applyTransform();
+  });
+  document.getElementById('zoom-reset-btn').addEventListener('click', ()=>{
+    scale = 0.38; panX = 0; panY = 0;
+    applyTransform();
+  });
+
+  // Box zoom toggle
+  const boxBtn = document.getElementById('zoom-box-btn');
+  boxBtn.addEventListener('click', ()=>{
+    isBoxMode = !isBoxMode;
+    boxBtn.style.background = isBoxMode ? 'var(--accent)' : '';
+    boxBtn.style.color = isBoxMode ? 'var(--bg)' : '';
+    wrap.style.cursor = isBoxMode ? 'crosshair' : 'grab';
+  });
+
+  // Scroll wheel zoom (centered on cursor)
+  wrap.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const delta = e.deltaY < 0 ? 1.12 : (1/1.12);
+    const newScale = Math.min(Math.max(scale * delta, 0.08), 4);
+    // Zoom toward cursor
+    panX = mx - (mx - panX) * (newScale / scale);
+    panY = my - (my - panY) * (newScale / scale);
+    scale = newScale;
+    applyTransform();
+  }, { passive: false });
+
+  // Mouse drag / box zoom
+  wrap.addEventListener('mousedown', (e)=>{
+    if(e.button !== 0) return;
+    if(isBoxMode){
+      const rect = wrap.getBoundingClientRect();
+      boxStartX = e.clientX - rect.left;
+      boxStartY = e.clientY - rect.top;
+      boxing = true;
+      zoomBox.style.display = 'block';
+      zoomBox.style.left = boxStartX+'px'; zoomBox.style.top = boxStartY+'px';
+      zoomBox.style.width = '0'; zoomBox.style.height = '0';
+    } else {
+      isDragging = true;
+      dragStartX = e.clientX; dragStartY = e.clientY;
+      panStartX = panX; panStartY = panY;
+      wrap.style.cursor = 'grabbing';
+    }
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e)=>{
+    if(boxing){
+      const rect = wrap.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const bx = Math.min(cx, boxStartX), by = Math.min(cy, boxStartY);
+      const bw = Math.abs(cx-boxStartX), bh = Math.abs(cy-boxStartY);
+      zoomBox.style.left=bx+'px'; zoomBox.style.top=by+'px';
+      zoomBox.style.width=bw+'px'; zoomBox.style.height=bh+'px';
+    } else if(isDragging){
+      panX = panStartX + (e.clientX - dragStartX);
+      panY = panStartY + (e.clientY - dragStartY);
+      applyTransform();
+    }
+  });
+
+  window.addEventListener('mouseup', (e)=>{
+    if(boxing){
+      boxing = false;
+      zoomBox.style.display = 'none';
+      const rect = wrap.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const bw = Math.abs(cx-boxStartX), bh = Math.abs(cy-boxStartY);
+      if(bw > 20 && bh > 20){
+        // Zoom to box
+        const scaleX = wrap.clientWidth / bw;
+        const scaleY = wrap.clientHeight / bh;
+        const newScale = Math.min(scaleX, scaleY) * scale * 0.92;
+        const bx = Math.min(cx, boxStartX), by = Math.min(cy, boxStartY);
+        panX = -(bx - panX) * (newScale/scale);
+        panY = -(by - panY) * (newScale/scale);
+        scale = Math.min(newScale, 4);
+        applyTransform();
+      }
+    }
+    if(isDragging){
+      isDragging = false;
+      wrap.style.cursor = isBoxMode ? 'crosshair' : 'grab';
+    }
+  });
+
+  // Touch pinch zoom
+  let lastTouchDist = null;
+  wrap.addEventListener('touchstart', (e)=>{
+    if(e.touches.length===2){
+      lastTouchDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    }
+  },{passive:true});
+  wrap.addEventListener('touchmove', (e)=>{
+    if(e.touches.length===2 && lastTouchDist){
+      const dist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      scale = Math.min(Math.max(scale * (dist/lastTouchDist), 0.08), 4);
+      lastTouchDist = dist;
+      applyTransform();
+    }
+  },{passive:true});
+
+})();
+
+</script>
+</body>
+</html>
