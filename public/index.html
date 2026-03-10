@@ -1771,7 +1771,7 @@ function setApiStatus(state, msg) {
   dot.className = 'dot ' + state;
   const labels = { online:'CONNECTED', offline:'OFFLINE MODE', error:'SYNC ERROR', loading:'CONNECTING...' };
   txt.textContent  = msg || labels[state] || state.toUpperCase();
-  urlD.textContent = window.API_URL ? '— ' + window.API_URL : '';
+  
 }
 
 async function apiLoadAll() {
