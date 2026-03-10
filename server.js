@@ -254,14 +254,18 @@ app.get('/api/pfd', async (_req,res) => {
   } catch(e){ res.status(500).json({ error:e.message }); }
 });
 
-// START
-async function start() {
+// START — server listen dulu, baru init DB
+app.listen(PORT, async () => {
+  console.log(`
+🔧 Corrosion Mapping API v2.0`);
+  console.log(`   Port: ${PORT} | DB: PostgreSQL`);
+  console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}
+`);
   try {
     await initDB();
-    app.listen(PORT, ()=>{
-      console.log(`\n🔧 Corrosion Mapping API v2.0`);
-      console.log(`   Port: ${PORT} | DB: PostgreSQL\n`);
-    });
-  } catch(e){ console.error('Failed to start:', e.message); process.exit(1); }
-}
-start();
+    console.log('DB ready');
+  } catch(e) {
+    console.error('DB init error:', e.message);
+    console.error(e.stack);
+  }
+});
