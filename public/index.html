@@ -1554,6 +1554,8 @@ function saveAllBulk() {
   banner.textContent=`✓ ${saved} RECORDS COMMITTED — MAP UPDATED`;
   document.body.appendChild(banner);
   setTimeout(()=>banner.remove(),2800);
+  // Sync ke API setelah bulk save
+  if(window.API_URL) apiPushAll();
 }
 
 // ════════════════════════════════════════════════
@@ -1756,6 +1758,90 @@ fullRender(); // initial render with seed data
   },{passive:true});
 
 })();
+
+
+// ═════════════════════════════════════════════════════════
+//  API INTEGRATION — Railway backend
+// ═════════════════════════════════════════════════════════
+function setApiStatus(state, msg) {
+  const dot  = document.getElementById('api-dot');
+  const txt  = document.getElementById('api-status-txt');
+  const urlD = document.getElementById('api-url-display');
+  if(!dot) return;
+  dot.className = 'dot ' + state;
+  const labels = { online:'CONNECTED', offline:'OFFLINE MODE', error:'SYNC ERROR', loading:'CONNECTING...' };
+  txt.textContent  = msg || labels[state] || state.toUpperCase();
+  urlD.textContent = window.API_URL ? '— ' + window.API_URL : '';
+}
+
+async function apiLoadAll() {
+  if(!window.API_URL) { setApiStatus('offline'); return; }
+  setApiStatus('loading');
+  try {
+    const [eqRes, lnRes] = await Promise.all([
+      fetch(window.API_URL + '/api/equipment'),
+      fetch(window.API_URL + '/api/lines')
+    ]);
+    if(!eqRes.ok || !lnRes.ok) throw new Error('API error');
+    const eqData = (await eqRes.json()).data || [];
+    const lnData = (await lnRes.json()).data || [];
+
+    eqData.forEach(eq => {
+      if(eq.measured_thickness && eq.corrosion_rate) {
+        inspData[eq.tag] = { measured: eq.measured_thickness, corrRate: eq.corrosion_rate };
+      }
+    });
+    lnData.forEach(ln => {
+      if(ln.measured_thickness && ln.corrosion_rate) {
+        lineData[ln.line_id] = { measured: ln.measured_thickness, corrRate: ln.corrosion_rate };
+      }
+    });
+
+    fullRender();
+    setApiStatus('online', 'CONNECTED — ' + eqData.length + ' EQ, ' + lnData.length + ' LINES');
+    showFlash('⟳ LOADED FROM API — ' + eqData.length + ' equipment', 'var(--good)');
+  } catch(e) {
+    setApiStatus('error', 'CONNECTION FAILED');
+    showFlash('⚠ API offline — using local data', 'var(--warning)');
+  }
+}
+
+async function apiPushAll() {
+  if(!window.API_URL) return;
+  try {
+    const eqPayload = Object.entries(inspData)
+      .filter(([,d]) => d.measured && d.corrRate)
+      .map(([tag,d]) => ({ tag, measured_thickness: d.measured, corrosion_rate: d.corrRate }));
+
+    const lnPayload = Object.entries(lineData)
+      .filter(([,d]) => d.measured && d.corrRate)
+      .map(([id,d]) => ({ line_id: id, measured_thickness: d.measured, corrosion_rate: d.corrRate }));
+
+    if(eqPayload.length > 0) {
+      await fetch(window.API_URL + '/api/equipment/bulk', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(eqPayload)
+      });
+    }
+    if(lnPayload.length > 0) {
+      await fetch(window.API_URL + '/api/lines/bulk', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(lnPayload)
+      });
+    }
+    setApiStatus('online');
+    showFlash('↑ SYNCED ' + (eqPayload.length + lnPayload.length) + ' ITEMS TO API', 'var(--good)');
+  } catch(e) {
+    setApiStatus('error', 'SYNC FAILED');
+  }
+}
+
+async function apiSyncAll() {
+  await apiLoadAll();
+}
+
+// Init: load dari API saat halaman dibuka
+apiLoadAll();
 
 </script>
 </body>
