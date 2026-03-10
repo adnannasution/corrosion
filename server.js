@@ -1,368 +1,267 @@
 /**
- * Corrosion Mapping System — REST API
- * Stack: Node.js + Express + JSON file database
- * Deploy: Railway (https://railway.app)
+ * Corrosion Mapping System — REST API v2.0
+ * Database: PostgreSQL (Railway) — data permanen, tidak hilang saat restart
  */
 
 const express = require('express');
 const cors    = require('cors');
 const fs      = require('fs');
 const path    = require('path');
+const { Pool } = require('pg');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'data', 'db.json');
 
-// ── Middleware ────────────────────────────────────────────
-app.use(cors({
-  origin: '*',
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization']
-}));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
+
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'] }));
 app.use(express.json());
-
-// Simple request logger
-// ── Serve frontend ────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
+app.use((req,_res,next)=>{ console.log(`${new Date().toISOString()} ${req.method} ${req.url}`); next(); });
 
-app.use((req, _res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-  next();
-});
+function calcRL(m,r,minA){ if(!m||!r||r<=0) return null; return parseFloat(((m-minA)/r).toFixed(2)); }
+function calcStatus(m,r,minA){ if(!m||!r||r<=0) return 'unknown'; const rl=(m-minA)/r; return rl<2?'critical':rl<5?'warning':rl<10?'monitor':'good'; }
 
-// ── DB helpers ────────────────────────────────────────────
-function readDB() {
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-}
+async function initDB() {
+  const client = await pool.connect();
+  try {
+    await client.query(`CREATE TABLE IF NOT EXISTS equipment (
+      id SERIAL PRIMARY KEY, tag VARCHAR(50) UNIQUE NOT NULL, name VARCHAR(200),
+      type VARCHAR(50), pfd_x INT, pfd_y INT, pfd_w INT, pfd_h INT,
+      nom_thickness FLOAT, min_allowable FLOAT, measured_thickness FLOAT,
+      corrosion_rate FLOAT, remaining_life_yr FLOAT, status VARCHAR(20) DEFAULT 'unknown',
+      last_inspection_date DATE, next_inspection_date DATE, notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
 
-function writeDB(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
-}
+    await client.query(`CREATE TABLE IF NOT EXISTS lines (
+      id SERIAL PRIMARY KEY, line_id VARCHAR(50) UNIQUE NOT NULL, description TEXT,
+      size VARCHAR(20), spec VARCHAR(50), nom_thickness FLOAT, min_allowable FLOAT,
+      measured_thickness FLOAT, corrosion_rate FLOAT, remaining_life_yr FLOAT,
+      status VARCHAR(20) DEFAULT 'unknown', last_inspection_date DATE,
+      next_inspection_date DATE, notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`);
 
-function nextId(arr) {
-  return arr.length === 0 ? 1 : Math.max(...arr.map(x => x.id)) + 1;
-}
+    await client.query(`CREATE TABLE IF NOT EXISTS inspection_history (
+      id SERIAL PRIMARY KEY, ref_type VARCHAR(20), ref_tag VARCHAR(50),
+      measured_thickness FLOAT, corrosion_rate FLOAT, remaining_life_yr FLOAT,
+      status VARCHAR(20), inspected_at TIMESTAMPTZ, notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW())`);
 
-function calcStatus(measured, corrRate, minAllow) {
-  if (!measured || !corrRate || corrRate <= 0) return 'unknown';
-  const rl = (measured - minAllow) / corrRate;
-  if (rl < 2)  return 'critical';
-  if (rl < 5)  return 'warning';
-  if (rl < 10) return 'monitor';
-  return 'good';
-}
-
-function calcRL(measured, corrRate, minAllow) {
-  if (!measured || !corrRate || corrRate <= 0) return null;
-  return parseFloat(((measured - minAllow) / corrRate).toFixed(2));
-}
-
-// ═══════════════════════════════════════════════════════════
-//  HEALTH
-// ═══════════════════════════════════════════════════════════
-app.get('/', (_req, res) => {
-  const db = readDB();
-  res.json({
-    service:  'Corrosion Mapping API',
-    version:  '1.0.0',
-    status:   'running',
-    counts: {
-      equipment: db.equipment.length,
-      lines:     db.lines.length,
-      history:   db.inspection_history.length
+    const { rows } = await client.query('SELECT COUNT(*) FROM equipment');
+    if (parseInt(rows[0].count) === 0) {
+      console.log('Seeding dari db.json...');
+      const seed = JSON.parse(fs.readFileSync(DB_PATH,'utf8'));
+      for (const eq of seed.equipment) {
+        await client.query(`INSERT INTO equipment (tag,name,type,pfd_x,pfd_y,pfd_w,pfd_h,
+          nom_thickness,min_allowable,measured_thickness,corrosion_rate,remaining_life_yr,status,notes)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (tag) DO NOTHING`,
+          [eq.tag,eq.name,eq.type,eq.pfd_x,eq.pfd_y,eq.pfd_w,eq.pfd_h,
+           eq.nom_thickness,eq.min_allowable,eq.measured_thickness,
+           eq.corrosion_rate,eq.remaining_life_yr,eq.status,eq.notes||'']);
+      }
+      for (const ln of seed.lines) {
+        await client.query(`INSERT INTO lines (line_id,description,size,spec,
+          nom_thickness,min_allowable,measured_thickness,corrosion_rate,remaining_life_yr,status,notes)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (line_id) DO NOTHING`,
+          [ln.line_id,ln.description,ln.size,ln.spec,
+           ln.nom_thickness,ln.min_allowable,ln.measured_thickness,
+           ln.corrosion_rate,ln.remaining_life_yr,ln.status,ln.notes||'']);
+      }
+      console.log(`Seed selesai: ${seed.equipment.length} equipment, ${seed.lines.length} lines`);
+    } else {
+      console.log(`DB sudah ada: ${rows[0].count} equipment`);
     }
-  });
+  } finally { client.release(); }
+}
+
+// HEALTH
+app.get('/health', (_req,res) => res.json({ status:'ok' }));
+app.get('/api', async (_req,res) => {
+  try {
+    const [e,l,h] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM equipment'),
+      pool.query('SELECT COUNT(*) FROM lines'),
+      pool.query('SELECT COUNT(*) FROM inspection_history')
+    ]);
+    res.json({ service:'Corrosion Mapping API', version:'2.0.0', database:'PostgreSQL',
+      counts:{ equipment:+e.rows[0].count, lines:+l.rows[0].count, history:+h.rows[0].count }});
+  } catch(e){ res.status(500).json({ error:e.message }); }
 });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
-
-// ═══════════════════════════════════════════════════════════
-//  EQUIPMENT
-// ═══════════════════════════════════════════════════════════
-
-// GET /api/equipment — list all (with optional ?status=critical|warning|monitor|good|unknown)
-app.get('/api/equipment', (req, res) => {
-  let db  = readDB();
-  let list = db.equipment;
-  if (req.query.status) {
-    list = list.filter(e => e.status === req.query.status);
-  }
-  if (req.query.type) {
-    list = list.filter(e => e.type === req.query.type);
-  }
-  res.json({ count: list.length, data: list });
+// EQUIPMENT
+app.get('/api/equipment', async (req,res) => {
+  try {
+    let q='SELECT * FROM equipment', p=[], c=[];
+    if(req.query.status){ c.push(`status=$${p.length+1}`); p.push(req.query.status); }
+    if(req.query.type)  { c.push(`type=$${p.length+1}`);   p.push(req.query.type); }
+    if(c.length) q+=' WHERE '+c.join(' AND ');
+    q+=' ORDER BY id';
+    const {rows}=await pool.query(q,p);
+    res.json({ count:rows.length, data:rows });
+  } catch(e){ res.status(500).json({ error:e.message }); }
 });
 
-// GET /api/equipment/:tag — single item
-app.get('/api/equipment/:tag', (req, res) => {
-  const db  = readDB();
-  const item = db.equipment.find(e => e.tag === req.params.tag);
-  if (!item) return res.status(404).json({ error: 'Tag not found' });
-  res.json(item);
+app.get('/api/equipment/:tag', async (req,res) => {
+  try {
+    const {rows}=await pool.query('SELECT * FROM equipment WHERE tag=$1',[req.params.tag]);
+    if(!rows.length) return res.status(404).json({ error:'Tag not found' });
+    res.json(rows[0]);
+  } catch(e){ res.status(500).json({ error:e.message }); }
 });
 
-// PUT /api/equipment/:tag — update inspection data
-app.put('/api/equipment/:tag', (req, res) => {
-  const db   = readDB();
-  const idx  = db.equipment.findIndex(e => e.tag === req.params.tag);
-  if (idx === -1) return res.status(404).json({ error: 'Tag not found' });
-
-  const old  = db.equipment[idx];
-  const { measured_thickness, corrosion_rate, last_inspection_date,
-          next_inspection_date, notes } = req.body;
-
-  const m  = measured_thickness  !== undefined ? measured_thickness  : old.measured_thickness;
-  const r  = corrosion_rate      !== undefined ? corrosion_rate      : old.corrosion_rate;
-
-  const updated = {
-    ...old,
-    measured_thickness:  m,
-    corrosion_rate:      r,
-    remaining_life_yr:   calcRL(m, r, old.min_allowable),
-    status:              calcStatus(m, r, old.min_allowable),
-    last_inspection_date: last_inspection_date ?? old.last_inspection_date,
-    next_inspection_date: next_inspection_date ?? old.next_inspection_date,
-    notes:               notes !== undefined ? notes : old.notes,
-    updated_at:          new Date().toISOString()
-  };
-
-  // Push to history
-  db.inspection_history.push({
-    id:         nextId(db.inspection_history),
-    ref_type:   'equipment',
-    ref_tag:    old.tag,
-    measured_thickness:  m,
-    corrosion_rate:      r,
-    remaining_life_yr:   calcRL(m, r, old.min_allowable),
-    status:              calcStatus(m, r, old.min_allowable),
-    inspected_at:        last_inspection_date || new Date().toISOString(),
-    notes:               notes || '',
-    created_at:          new Date().toISOString()
-  });
-
-  db.equipment[idx] = updated;
-  writeDB(db);
-  res.json(updated);
+app.put('/api/equipment/:tag', async (req,res) => {
+  try {
+    const {rows:cur}=await pool.query('SELECT * FROM equipment WHERE tag=$1',[req.params.tag]);
+    if(!cur.length) return res.status(404).json({ error:'Tag not found' });
+    const old=cur[0];
+    const m=req.body.measured_thickness??old.measured_thickness;
+    const r=req.body.corrosion_rate??old.corrosion_rate;
+    const rl=calcRL(m,r,old.min_allowable), st=calcStatus(m,r,old.min_allowable);
+    const {rows}=await pool.query(`UPDATE equipment SET measured_thickness=$1,corrosion_rate=$2,
+      remaining_life_yr=$3,status=$4,last_inspection_date=$5,next_inspection_date=$6,
+      notes=$7,updated_at=NOW() WHERE tag=$8 RETURNING *`,
+      [m,r,rl,st,req.body.last_inspection_date||old.last_inspection_date,
+       req.body.next_inspection_date||old.next_inspection_date,
+       req.body.notes??old.notes,req.params.tag]);
+    await pool.query(`INSERT INTO inspection_history (ref_type,ref_tag,measured_thickness,
+      corrosion_rate,remaining_life_yr,status,inspected_at,notes)
+      VALUES ('equipment',$1,$2,$3,$4,$5,$6,$7)`,
+      [req.params.tag,m,r,rl,st,req.body.last_inspection_date||new Date().toISOString(),req.body.notes||'']);
+    res.json(rows[0]);
+  } catch(e){ res.status(500).json({ error:e.message }); }
 });
 
-// POST /api/equipment/bulk — update multiple tags at once
-// Body: [ { tag, measured_thickness, corrosion_rate, ... }, ... ]
-app.post('/api/equipment/bulk', (req, res) => {
-  if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Body must be array' });
-  const db = readDB();
-  const results = [];
+app.post('/api/equipment/bulk', async (req,res) => {
+  if(!Array.isArray(req.body)) return res.status(400).json({ error:'Body must be array' });
+  const results=[];
+  try {
+    for(const item of req.body){
+      const {rows:cur}=await pool.query('SELECT * FROM equipment WHERE tag=$1',[item.tag]);
+      if(!cur.length) continue;
+      const old=cur[0];
+      const m=item.measured_thickness??old.measured_thickness;
+      const r=item.corrosion_rate??old.corrosion_rate;
+      const rl=calcRL(m,r,old.min_allowable), st=calcStatus(m,r,old.min_allowable);
+      const {rows}=await pool.query(`UPDATE equipment SET measured_thickness=$1,corrosion_rate=$2,
+        remaining_life_yr=$3,status=$4,notes=$5,updated_at=NOW() WHERE tag=$6 RETURNING *`,
+        [m,r,rl,st,item.notes??old.notes,item.tag]);
+      results.push(rows[0]);
+    }
+    res.json({ updated:results.length, data:results });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
 
-  req.body.forEach(item => {
-    const idx = db.equipment.findIndex(e => e.tag === item.tag);
-    if (idx === -1) return;
-    const old = db.equipment[idx];
-    const m = item.measured_thickness ?? old.measured_thickness;
-    const r = item.corrosion_rate     ?? old.corrosion_rate;
-    const updated = {
-      ...old,
-      measured_thickness:  m,
-      corrosion_rate:      r,
-      remaining_life_yr:   calcRL(m, r, old.min_allowable),
-      status:              calcStatus(m, r, old.min_allowable),
-      last_inspection_date: item.last_inspection_date ?? old.last_inspection_date,
-      next_inspection_date: item.next_inspection_date ?? old.next_inspection_date,
-      notes:               item.notes !== undefined ? item.notes : old.notes,
-      updated_at:          new Date().toISOString()
-    };
-    db.equipment[idx] = updated;
-    db.inspection_history.push({
-      id: nextId(db.inspection_history),
-      ref_type: 'equipment', ref_tag: old.tag,
-      measured_thickness: m, corrosion_rate: r,
-      remaining_life_yr: calcRL(m, r, old.min_allowable),
-      status: calcStatus(m, r, old.min_allowable),
-      inspected_at: item.last_inspection_date || new Date().toISOString(),
-      notes: item.notes || '', created_at: new Date().toISOString()
+// LINES
+app.get('/api/lines', async (req,res) => {
+  try {
+    let q='SELECT * FROM lines', p=[];
+    if(req.query.status){ q+=' WHERE status=$1'; p.push(req.query.status); }
+    q+=' ORDER BY id';
+    const {rows}=await pool.query(q,p);
+    res.json({ count:rows.length, data:rows });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+app.get('/api/lines/:id', async (req,res) => {
+  try {
+    const {rows}=await pool.query('SELECT * FROM lines WHERE line_id=$1',[req.params.id]);
+    if(!rows.length) return res.status(404).json({ error:'Line not found' });
+    res.json(rows[0]);
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+app.put('/api/lines/:id', async (req,res) => {
+  try {
+    const {rows:cur}=await pool.query('SELECT * FROM lines WHERE line_id=$1',[req.params.id]);
+    if(!cur.length) return res.status(404).json({ error:'Line not found' });
+    const old=cur[0];
+    const m=req.body.measured_thickness??old.measured_thickness;
+    const r=req.body.corrosion_rate??old.corrosion_rate;
+    const rl=calcRL(m,r,old.min_allowable), st=calcStatus(m,r,old.min_allowable);
+    const {rows}=await pool.query(`UPDATE lines SET measured_thickness=$1,corrosion_rate=$2,
+      remaining_life_yr=$3,status=$4,notes=$5,updated_at=NOW() WHERE line_id=$6 RETURNING *`,
+      [m,r,rl,st,req.body.notes??old.notes,req.params.id]);
+    await pool.query(`INSERT INTO inspection_history (ref_type,ref_tag,measured_thickness,
+      corrosion_rate,remaining_life_yr,status,inspected_at,notes)
+      VALUES ('line',$1,$2,$3,$4,$5,$6,$7)`,
+      [req.params.id,m,r,rl,st,req.body.last_inspection_date||new Date().toISOString(),req.body.notes||'']);
+    res.json(rows[0]);
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/lines/bulk', async (req,res) => {
+  if(!Array.isArray(req.body)) return res.status(400).json({ error:'Body must be array' });
+  const results=[];
+  try {
+    for(const item of req.body){
+      const {rows:cur}=await pool.query('SELECT * FROM lines WHERE line_id=$1',[item.line_id]);
+      if(!cur.length) continue;
+      const old=cur[0];
+      const m=item.measured_thickness??old.measured_thickness;
+      const r=item.corrosion_rate??old.corrosion_rate;
+      const rl=calcRL(m,r,old.min_allowable), st=calcStatus(m,r,old.min_allowable);
+      const {rows}=await pool.query(`UPDATE lines SET measured_thickness=$1,corrosion_rate=$2,
+        remaining_life_yr=$3,status=$4,updated_at=NOW() WHERE line_id=$5 RETURNING *`,
+        [m,r,rl,st,item.line_id]);
+      results.push(rows[0]);
+    }
+    res.json({ updated:results.length, data:results });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// HISTORY
+app.get('/api/history', async (req,res) => {
+  try {
+    let q='SELECT * FROM inspection_history', p=[], c=[];
+    if(req.query.tag) { c.push(`ref_tag=$${p.length+1}`);  p.push(req.query.tag); }
+    if(req.query.type){ c.push(`ref_type=$${p.length+1}`); p.push(req.query.type); }
+    if(c.length) q+=' WHERE '+c.join(' AND ');
+    q+=' ORDER BY inspected_at DESC LIMIT 500';
+    const {rows}=await pool.query(q,p);
+    res.json({ count:rows.length, data:rows });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// SUMMARY
+app.get('/api/summary', async (_req,res) => {
+  try {
+    const [eq,ln,hi,crit]=await Promise.all([
+      pool.query('SELECT status,COUNT(*) FROM equipment GROUP BY status'),
+      pool.query('SELECT status,COUNT(*) FROM lines GROUP BY status'),
+      pool.query('SELECT COUNT(*) FROM inspection_history'),
+      pool.query(`SELECT tag,name,remaining_life_yr FROM equipment
+        WHERE status='critical' ORDER BY remaining_life_yr ASC NULLS LAST`)
+    ]);
+    const counts={good:0,monitor:0,warning:0,critical:0,unknown:0};
+    [...eq.rows,...ln.rows].forEach(r=>{ if(counts[r.status]!==undefined) counts[r.status]+=+r.count; });
+    res.json({ total:Object.values(counts).reduce((a,b)=>a+b,0), ...counts,
+      equipment_count:eq.rows.reduce((a,r)=>a+ +r.count,0),
+      lines_count:ln.rows.reduce((a,r)=>a+ +r.count,0),
+      history_count:+hi.rows[0].count,
+      critical_items:crit.rows, last_updated:new Date().toISOString() });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// PFD
+app.get('/api/pfd', async (_req,res) => {
+  try {
+    const {rows}=await pool.query('SELECT tag,type,pfd_x,pfd_y,pfd_w,pfd_h,status,remaining_life_yr FROM equipment ORDER BY id');
+    res.json({ canvas:{width:2800,height:1400}, equipment:rows });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// START
+async function start() {
+  try {
+    await initDB();
+    app.listen(PORT, ()=>{
+      console.log(`\n🔧 Corrosion Mapping API v2.0`);
+      console.log(`   Port: ${PORT} | DB: PostgreSQL\n`);
     });
-    results.push(updated);
-  });
-
-  writeDB(db);
-  res.json({ updated: results.length, data: results });
-});
-
-// ═══════════════════════════════════════════════════════════
-//  LINES
-// ═══════════════════════════════════════════════════════════
-
-app.get('/api/lines', (req, res) => {
-  let db   = readDB();
-  let list = db.lines;
-  if (req.query.status) list = list.filter(l => l.status === req.query.status);
-  res.json({ count: list.length, data: list });
-});
-
-app.get('/api/lines/:id', (req, res) => {
-  const db   = readDB();
-  const item = db.lines.find(l => l.line_id === req.params.id);
-  if (!item) return res.status(404).json({ error: 'Line not found' });
-  res.json(item);
-});
-
-app.put('/api/lines/:id', (req, res) => {
-  const db  = readDB();
-  const idx = db.lines.findIndex(l => l.line_id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Line not found' });
-
-  const old = db.lines[idx];
-  const { measured_thickness, corrosion_rate, last_inspection_date,
-          next_inspection_date, notes } = req.body;
-  const m = measured_thickness !== undefined ? measured_thickness : old.measured_thickness;
-  const r = corrosion_rate     !== undefined ? corrosion_rate     : old.corrosion_rate;
-
-  const updated = {
-    ...old,
-    measured_thickness: m, corrosion_rate: r,
-    remaining_life_yr: calcRL(m, r, old.min_allowable),
-    status:            calcStatus(m, r, old.min_allowable),
-    last_inspection_date: last_inspection_date ?? old.last_inspection_date,
-    next_inspection_date: next_inspection_date ?? old.next_inspection_date,
-    notes: notes !== undefined ? notes : old.notes,
-    updated_at: new Date().toISOString()
-  };
-
-  db.inspection_history.push({
-    id: nextId(db.inspection_history),
-    ref_type: 'line', ref_tag: old.line_id,
-    measured_thickness: m, corrosion_rate: r,
-    remaining_life_yr: calcRL(m, r, old.min_allowable),
-    status: calcStatus(m, r, old.min_allowable),
-    inspected_at: last_inspection_date || new Date().toISOString(),
-    notes: notes || '', created_at: new Date().toISOString()
-  });
-
-  db.lines[idx] = updated;
-  writeDB(db);
-  res.json(updated);
-});
-
-app.post('/api/lines/bulk', (req, res) => {
-  if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Body must be array' });
-  const db = readDB();
-  const results = [];
-
-  req.body.forEach(item => {
-    const idx = db.lines.findIndex(l => l.line_id === item.line_id);
-    if (idx === -1) return;
-    const old = db.lines[idx];
-    const m = item.measured_thickness ?? old.measured_thickness;
-    const r = item.corrosion_rate     ?? old.corrosion_rate;
-    const updated = {
-      ...old,
-      measured_thickness: m, corrosion_rate: r,
-      remaining_life_yr: calcRL(m, r, old.min_allowable),
-      status: calcStatus(m, r, old.min_allowable),
-      last_inspection_date: item.last_inspection_date ?? old.last_inspection_date,
-      notes: item.notes !== undefined ? item.notes : old.notes,
-      updated_at: new Date().toISOString()
-    };
-    db.lines[idx] = updated;
-    results.push(updated);
-  });
-
-  writeDB(db);
-  res.json({ updated: results.length, data: results });
-});
-
-// ═══════════════════════════════════════════════════════════
-//  INSPECTION HISTORY
-// ═══════════════════════════════════════════════════════════
-
-app.get('/api/history', (req, res) => {
-  const db   = readDB();
-  let list   = db.inspection_history;
-  if (req.query.tag)  list = list.filter(h => h.ref_tag  === req.query.tag);
-  if (req.query.type) list = list.filter(h => h.ref_type === req.query.type);
-  // Sort newest first
-  list = [...list].sort((a, b) => new Date(b.inspected_at) - new Date(a.inspected_at));
-  res.json({ count: list.length, data: list });
-});
-
-// ═══════════════════════════════════════════════════════════
-//  SUMMARY / DASHBOARD
-// ═══════════════════════════════════════════════════════════
-
-app.get('/api/summary', (_req, res) => {
-  const db = readDB();
-  const all = [...db.equipment, ...db.lines];
-
-  const summary = {
-    total:   all.length,
-    good:     all.filter(x => x.status === 'good').length,
-    monitor:  all.filter(x => x.status === 'monitor').length,
-    warning:  all.filter(x => x.status === 'warning').length,
-    critical: all.filter(x => x.status === 'critical').length,
-    unknown:  all.filter(x => x.status === 'unknown').length,
-    equipment_count: db.equipment.length,
-    lines_count:     db.lines.length,
-    history_count:   db.inspection_history.length,
-    critical_items: all
-      .filter(x => x.status === 'critical')
-      .map(x => ({ tag: x.tag || x.line_id, name: x.name || x.description, remaining_life_yr: x.remaining_life_yr }))
-      .sort((a, b) => (a.remaining_life_yr || 99) - (b.remaining_life_yr || 99)),
-    last_updated: new Date().toISOString()
-  };
-
-  res.json(summary);
-});
-
-// ═══════════════════════════════════════════════════════════
-//  SETTINGS
-// ═══════════════════════════════════════════════════════════
-
-app.get('/api/settings', (_req, res) => {
-  const db = readDB();
-  const obj = {};
-  db.settings.forEach(s => { obj[s.key] = s.value; });
-  res.json(obj);
-});
-
-app.put('/api/settings/:key', (req, res) => {
-  const db  = readDB();
-  const idx = db.settings.findIndex(s => s.key === req.params.key);
-  if (idx === -1) {
-    db.settings.push({ id: nextId(db.settings), key: req.params.key, value: req.body.value });
-  } else {
-    db.settings[idx].value = req.body.value;
-  }
-  writeDB(db);
-  res.json({ key: req.params.key, value: req.body.value });
-});
-
-// ═══════════════════════════════════════════════════════════
-//  PFD LAYOUT (for frontend)
-// ═══════════════════════════════════════════════════════════
-
-app.get('/api/pfd', (_req, res) => {
-  const db = readDB();
-  const layout = db.equipment.map(e => ({
-    tag:    e.tag,
-    type:   e.type,
-    x: e.pfd_x, y: e.pfd_y, w: e.pfd_w, h: e.pfd_h,
-    status: e.status,
-    remaining_life_yr: e.remaining_life_yr
-  }));
-  res.json({ canvas: { width: 2800, height: 1400 }, equipment: layout });
-});
-
-// ═══════════════════════════════════════════════════════════
-//  404 fallback
-// ═══════════════════════════════════════════════════════════
-app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
-
-// ── Start ──────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🔧 Corrosion Mapping API`);
-  console.log(`   Port   : ${PORT}`);
-  console.log(`   DB     : ${DB_PATH}`);
-  console.log(`   Routes : GET/PUT /api/equipment/:tag`);
-  console.log(`            GET/PUT /api/lines/:id`);
-  console.log(`            GET     /api/summary`);
-  console.log(`            GET     /api/history`);
-  console.log(`            GET     /api/pfd\n`);
-});
+  } catch(e){ console.error('Failed to start:', e.message); process.exit(1); }
+}
+start();
